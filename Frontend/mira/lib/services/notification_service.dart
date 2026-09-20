@@ -1,17 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// 한글 음절의 마지막 글자에 받침이 있는지에 따라 조사를 골라준다.
-/// (완성형 한글 유니코드 범위 0xAC00~0xD7A3에서 (code - 0xAC00) % 28 != 0 이면 받침 있음)
-String _withParticle(String word, {required String withBatchim, required String noBatchim}) {
-  if (word.isEmpty) return '$word$noBatchim';
-  final code = word.runes.last;
-  if (code < 0xAC00 || code > 0xD7A3) return '$word$noBatchim';
-  final hasBatchim = (code - 0xAC00) % 28 != 0;
-  return '$word${hasBatchim ? withBatchim : noBatchim}';
-}
-
-String _withIGa(String word) => _withParticle(word, withBatchim: '이', noBatchim: '가');
-String _withEulReul(String word) => _withParticle(word, withBatchim: '을', noBatchim: '를');
+import '../utils/korean_particles.dart';
 
 /// users/{userId}/notifications — Backend/firestore-schema.md 참고.
 /// moodAlert(감정 소식), commentAlert(댓글), careAlert(돌봄 배정/완료)에 사용한다.
@@ -72,7 +61,7 @@ class NotificationService {
     await _collection(toUserId).add({
       'type': 'commentAlert',
       'title': '새 댓글',
-      'message': '${_withIGa(fromRole)} 댓글을 남겼어요.',
+      'message': '${withIGa(fromRole)} 댓글을 남겼어요.',
       'isRead': false,
       'relatedId': relatedId,
       'createdAt': FieldValue.serverTimestamp(),
@@ -103,7 +92,7 @@ class NotificationService {
     await _collection(toUserId).add({
       'type': 'careAlert',
       'title': '오늘의 돌봄',
-      'message': '${_withIGa(fromRole)} "$action"${_withEulReul(action)} 완료했어요.',
+      'message': '${withIGa(fromRole)} "$action"${eulReul(action)} 완료했어요.',
       'isRead': false,
       'relatedId': null,
       'createdAt': FieldValue.serverTimestamp(),
