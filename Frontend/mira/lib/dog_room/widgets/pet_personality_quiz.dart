@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/pet_personality.dart';
+import '../../widgets/word_wrap_text.dart';
 
 class PetPersonalityQuiz extends StatefulWidget {
   const PetPersonalityQuiz({super.key, this.initial});
@@ -25,14 +26,14 @@ class _PetPersonalityQuizState extends State<PetPersonalityQuiz> {
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
-          const Text('평소 모습을 떠올려 골라주세요. 답이 대화 말투에 반영돼요.'),
+          const WordWrapText('평소 모습을 떠올려 골라주세요. 답이 대화 말투에 반영돼요.'),
           const SizedBox(height: 16),
           LinearProgressIndicator(
             value: (_step + 1) / 4,
             borderRadius: BorderRadius.circular(8),
           ),
           const SizedBox(height: 24),
-          Text(
+          WordWrapText(
             PetPersonality.questions[_step],
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
           ),
@@ -50,7 +51,7 @@ class _PetPersonalityQuizState extends State<PetPersonalityQuiz> {
                     padding: const EdgeInsets.all(18),
                   ),
                   onPressed: () => setState(() => _answers[_step] = i),
-                  child: Text(PetPersonality.options[_step][i]),
+                  child: WordWrapText(PetPersonality.options[_step][i]),
                 ),
               ),
             ),

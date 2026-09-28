@@ -13,11 +13,12 @@ class NotificationService {
   CollectionReference<Map<String, dynamic>> _collection(String userId) =>
       _firestore.collection('users').doc(userId).collection('notifications');
 
-  DocumentReference<Map<String, dynamic>> _preferencesDoc(String userId) => _firestore
-      .collection('users')
-      .doc(userId)
-      .collection('settings')
-      .doc('preferences');
+  DocumentReference<Map<String, dynamic>> _preferencesDoc(String userId) =>
+      _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('settings')
+          .doc('preferences');
 
   // 다른 가족 구성원의 클라이언트에서 나에게 알림을 보내기 전에 내 알림 설정을
   // 확인해야 해서, 설정 화면(기기 로컬 저장소가 아니라)이 아니라 Firestore에 둔다.
@@ -99,7 +100,9 @@ class NotificationService {
     });
   }
 
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> watchUnread(String userId) {
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> watchUnread(
+    String userId,
+  ) {
     return _collection(userId)
         .where('isRead', isEqualTo: false)
         .orderBy('createdAt', descending: false)
@@ -109,5 +112,20 @@ class NotificationService {
 
   Future<void> markRead(String userId, String notificationId) {
     return _collection(userId).doc(notificationId).update({'isRead': true});
+  }
+
+  Stream<List<Map<String, dynamic>>> watchRecent(String userId) =>
+      _collection(userId)
+          .orderBy('createdAt', descending: true)
+          .limit(100)
+          .snapshots()
+          .map((s) => s.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+
+  Future<void> markManyRead(String userId, List<String> ids) async {
+    final batch = _firestore.batch();
+    for (final id in ids.toSet()) {
+      batch.update(_collection(userId).doc(id), {'isRead': true});
+    }
+    await batch.commit();
   }
 }

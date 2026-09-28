@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/word_wrap_text.dart';
 
 const privacyVersion = '2026-09-06';
 const privacyKey = 'mira_privacy_acknowledgement_v1';
@@ -87,7 +88,7 @@ void showPrivacyDocument(BuildContext context, {bool terms = false}) {
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
+              WordWrapText(
                 section.$2,
                 style: const TextStyle(fontSize: 16, height: 1.7),
               ),

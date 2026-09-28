@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import '../widgets/word_wrap_text.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -682,7 +683,7 @@ class _PhotoDetailPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if ((data['body'] as String? ?? '').isNotEmpty)
-                    Text(
+                    WordWrapText(
                       data['body'] as String,
                       style: const TextStyle(fontSize: 16, height: 1.65),
                     ),
@@ -821,14 +822,22 @@ class _CommentComposerState extends State<_CommentComposer> {
       final photoAuthorUid = widget.photoAuthorUid;
       if (photoAuthorUid != null && photoAuthorUid != widget.uid) {
         unawaited(
-          NotificationService.instance.sendCommentAlert(
-            toUserId: photoAuthorUid,
-            fromRole: myRole,
-            relatedId: widget.photoId,
-          ),
+          NotificationService.instance
+              .sendCommentAlert(
+                toUserId: photoAuthorUid,
+                fromRole: myRole,
+                relatedId: widget.photoId,
+              )
+              .catchError((Object _) {}),
         );
       }
-      _controller.clear();
+      if (mounted) _controller.clear();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('댓글을 저장하지 못했어요. 다시 시도해주세요.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }

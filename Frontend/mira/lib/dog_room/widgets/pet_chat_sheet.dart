@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/ai_server_service.dart';
 import '../../services/pet_service.dart';
 import '../models/pet_personality.dart';
+import '../../widgets/word_wrap_text.dart';
 
 class PetChatSheet extends StatefulWidget {
   const PetChatSheet({super.key, required this.careContext, this.familyId});
@@ -29,6 +30,7 @@ class _PetChatSheetState extends State<PetChatSheet> {
       final pet = widget.familyId == null
           ? null
           : await PetService.instance.fetchPet(widget.familyId!);
+      if (!mounted) return;
       final personality = PetPersonality.fromJson(pet?['personalityProfile']);
       final reply = await AiServerService.instance.chatWithPet(
         petName: pet?['name'] as String? ?? '',
@@ -118,7 +120,7 @@ class _PetChatSheetState extends State<PetChatSheet> {
                           : null,
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Text(turn['text']!),
+                        child: WordWrapText(turn['text']!),
                       ),
                     ),
                   );
@@ -129,7 +131,7 @@ class _PetChatSheetState extends State<PetChatSheet> {
             if (_busy)
               const Padding(
                 padding: EdgeInsets.all(8),
-                child: Text('강아지가 답변을 생각하고 있어요. 잠시만 기다려주세요.'),
+                child: WordWrapText('강아지가 답변을 생각하고 있어요. 잠시만 기다려주세요.'),
               ),
             if (_error != null)
               Text(
