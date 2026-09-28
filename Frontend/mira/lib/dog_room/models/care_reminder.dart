@@ -19,16 +19,17 @@ class CareReminder {
   }
 }
 
-CareReminder? pendingCare(
+List<CareReminder> pendingCareReminders(
   Map<String, dynamic> care,
   Map<String, dynamic> members,
   DateTime now, {
   bool ignoreDeadlines = false,
 }) {
-  if (care['_dateId'] != null && care['_dateId'] != careDate(now)) return null;
+  if (care['_dateId'] != null && care['_dateId'] != careDate(now)) return [];
   final hour = now.toUtc().add(const Duration(hours: 9)).hour;
   // Don't wake the household overnight. Actions have separate due times.
-  if (!ignoreDeadlines && hour < 8) return null;
+  if (!ignoreDeadlines && hour < 8) return [];
+  final reminders = <CareReminder>[];
   const deadlines = [12, 18, 18, 21];
   for (var i = 0; i < careActions.length; i++) {
     if (!ignoreDeadlines && hour < deadlines[i]) continue;
@@ -37,14 +38,28 @@ CareReminder? pendingCare(
       if (record is Map &&
           record['action'] == careActions[i] &&
           record['completedAt'] == null) {
-        return CareReminder(
-          uid,
-          members[uid] as String,
-          careActions[i],
-          careDate(now),
+        reminders.add(
+          CareReminder(
+            uid,
+            members[uid] as String,
+            careActions[i],
+            careDate(now),
+          ),
         );
       }
     }
   }
-  return null;
+  return reminders;
 }
+
+CareReminder? pendingCare(
+  Map<String, dynamic> care,
+  Map<String, dynamic> members,
+  DateTime now, {
+  bool ignoreDeadlines = false,
+}) => pendingCareReminders(
+  care,
+  members,
+  now,
+  ignoreDeadlines: ignoreDeadlines,
+).firstOrNull;

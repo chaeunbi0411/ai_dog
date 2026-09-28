@@ -42,6 +42,8 @@ class DogState {
     this.energy = 70,
     this.affection = 0,
     this.experience = 0,
+    this.accessory = 'none',
+    this.roomTheme = 'default',
     required this.lastUpdated,
   });
 
@@ -51,6 +53,31 @@ class DogState {
   final int energy;
   final int affection;
   final int experience;
+  final String accessory;
+  final String roomTheme;
+  bool get wardrobeUnlocked => level >= 6;
+  bool get roomThemesUnlocked => level >= 16;
+  int rewardCount(AdultReward reward) {
+    final firstLevel = 32 + reward.index;
+    return level < firstLevel ? 0 : 1 + (level - firstLevel) ~/ 4;
+  }
+
+  String? get familyTitle => level >= 99
+      ? '전설의 화목한 가문'
+      : level >= 77
+      ? '화목함의 끝판왕 가족'
+      : level >= 50
+      ? '소통의 달인 가족'
+      : null;
+
+  bool canWear(String value) =>
+      value == 'none' ||
+      (value == 'ribbon' && wardrobeUnlocked) ||
+      (value == 'crown' && rewardCount(AdultReward.hat) > 0);
+  bool canUseTheme(String value) =>
+      value == 'default' ||
+      (value == 'spring' && roomThemesUnlocked) ||
+      (value == 'starlight' && rewardCount(AdultReward.background) > 0);
   final DateTime lastUpdated;
 
   GrowthStage get stage {
@@ -115,6 +142,8 @@ class DogState {
     int? energy,
     int? affection,
     int? experience,
+    String? accessory,
+    String? roomTheme,
     DateTime? lastUpdated,
   }) => DogState(
     hunger: hunger ?? this.hunger,
@@ -123,6 +152,8 @@ class DogState {
     energy: energy ?? this.energy,
     affection: affection ?? this.affection,
     experience: experience ?? this.experience,
+    accessory: accessory ?? this.accessory,
+    roomTheme: roomTheme ?? this.roomTheme,
     lastUpdated: lastUpdated ?? this.lastUpdated,
   );
 
@@ -133,6 +164,8 @@ class DogState {
     'energy': energy,
     'affection': affection,
     'experience': experience,
+    'accessory': accessory,
+    'roomTheme': roomTheme,
     'lastUpdated': lastUpdated.toIso8601String(),
   };
 
@@ -143,6 +176,8 @@ class DogState {
     energy: _readStat(json, 'energy', 70),
     affection: _readNonNegative(json, 'affection'),
     experience: _readNonNegative(json, 'experience'),
+    accessory: json['accessory'] as String? ?? 'none',
+    roomTheme: json['roomTheme'] as String? ?? 'default',
     lastUpdated:
         DateTime.tryParse(json['lastUpdated'] as String? ?? '') ??
         DateTime.now(),

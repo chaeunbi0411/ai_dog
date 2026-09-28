@@ -1,3 +1,4 @@
+import '../../widgets/word_wrap_text.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/dog_controller.dart';
@@ -116,7 +117,7 @@ class _CareButton extends StatelessWidget {
                   height: 32,
                 ),
               const SizedBox(height: 7),
-              Text(
+              WordSafeText(
                 label,
                 style: const TextStyle(
                   fontSize: 14,

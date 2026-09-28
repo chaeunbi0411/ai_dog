@@ -22,7 +22,7 @@ Future<void> showMoodDiarySheet(BuildContext context) async {
   if (uid == null) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('로그인 후 이용할 수 있어요.')));
+    ).showSnackBar(const SnackBar(content: WordSafeText('로그인 후 이용할 수 있어요.')));
     return;
   }
   String? familyId;
@@ -31,7 +31,7 @@ Future<void> showMoodDiarySheet(BuildContext context) async {
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('가족 정보를 불러오지 못했어요. 다시 시도해주세요.')),
+        const SnackBar(content: WordSafeText('가족 정보를 불러오지 못했어요. 다시 시도해주세요.')),
       );
     }
     return;
@@ -40,7 +40,7 @@ Future<void> showMoodDiarySheet(BuildContext context) async {
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('가족에 먼저 참여해주세요.')));
+      ).showSnackBar(const SnackBar(content: WordSafeText('가족에 먼저 참여해주세요.')));
     }
     return;
   }
@@ -55,12 +55,12 @@ Future<void> showMoodDiarySheet(BuildContext context) async {
   await showDialog<void>(
     context: context,
     builder: (c) => AlertDialog(
-      title: const Text('오늘의 기록을 남겼어요'),
+      title: const WordSafeText('오늘의 기록을 남겼어요'),
       content: SingleChildScrollView(child: WordWrapText(result.selfMessage)),
       actions: [
         FilledButton(
           onPressed: () => Navigator.pop(c),
-          child: const Text('확인'),
+          child: const WordSafeText('확인'),
         ),
       ],
     ),
@@ -169,7 +169,7 @@ class _MoodDiarySheetState extends State<_MoodDiarySheet> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        const WordSafeText(
           '나의 오늘 감정',
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
         ),
@@ -185,7 +185,7 @@ class _MoodDiarySheetState extends State<_MoodDiarySheet> {
           children: moodTags
               .map(
                 (tag) => ChoiceChip(
-                  label: Text(tag),
+                  label: WordSafeText(tag),
                   selected: _moodTag == tag,
                   onSelected: _submitting
                       ? null
@@ -206,7 +206,7 @@ class _MoodDiarySheetState extends State<_MoodDiarySheet> {
         ),
         if (_error != null) ...[
           const SizedBox(height: 10),
-          Text(
+          WordSafeText(
             _error!,
             style: const TextStyle(color: Colors.red, fontSize: 12),
           ),
@@ -225,7 +225,7 @@ class _MoodDiarySheetState extends State<_MoodDiarySheet> {
                       color: Colors.white,
                     ),
                   )
-                : const Text('감정 기록하기'),
+                : const WordSafeText('감정 기록하기'),
           ),
         ),
       ],

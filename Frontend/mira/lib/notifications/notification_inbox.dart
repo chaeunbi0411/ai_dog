@@ -38,7 +38,7 @@ class _NotificationInboxState extends State<NotificationInbox> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('읽음 상태를 저장하지 못했어요. 다시 시도해주세요.')),
+          const SnackBar(content: WordSafeText('읽음 상태를 저장하지 못했어요. 다시 시도해주세요.')),
         );
       }
     } finally {
@@ -55,9 +55,9 @@ class _NotificationInboxState extends State<NotificationInbox> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('알림함')),
+    appBar: AppBar(title: const WordSafeText('알림함')),
     body: widget.userId == null && widget.notifications == null
-        ? const Center(child: Text('로그인 후 알림을 볼 수 있어요.'))
+        ? const Center(child: WordSafeText('로그인 후 알림을 볼 수 있어요.'))
         : StreamBuilder<List<Map<String, dynamic>>>(
             stream: _stream,
             builder: (context, snapshot) {
@@ -66,10 +66,10 @@ class _NotificationInboxState extends State<NotificationInbox> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('알림을 불러오지 못했어요.'),
+                      const WordSafeText('알림을 불러오지 못했어요.'),
                       TextButton(
                         onPressed: () => setState(() => _stream = _connect()),
-                        child: const Text('재시도'),
+                        child: const WordSafeText('재시도'),
                       ),
                     ],
                   ),
@@ -90,7 +90,7 @@ class _NotificationInboxState extends State<NotificationInbox> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         FilterChip(
-                          label: Text('안 읽은 알림 ${unread.length}'),
+                          label: WordSafeText('안 읽은 알림 ${unread.length}'),
                           selected: _unreadOnly,
                           onSelected: (v) => setState(() => _unreadOnly = v),
                         ),
@@ -100,20 +100,20 @@ class _NotificationInboxState extends State<NotificationInbox> {
                               : () => _read(
                                   unread.map((n) => n['id'] as String).toList(),
                                 ),
-                          child: const Text('표시된 알림 모두 읽음'),
+                          child: const WordSafeText('표시된 알림 모두 읽음'),
                         ),
                       ],
                     ),
                   ),
                   const Padding(
                     padding: EdgeInsets.all(8),
-                    child: Text('최근 알림 100개를 보여드려요.'),
+                    child: WordSafeText('최근 알림 100개를 보여드려요.'),
                   ),
                   if (_saving) const LinearProgressIndicator(),
                   Expanded(
                     child: visible.isEmpty
                         ? Center(
-                            child: Text(
+                            child: WordSafeText(
                               _unreadOnly ? '안 읽은 알림이 없어요.' : '아직 받은 알림이 없어요.',
                             ),
                           )
@@ -152,8 +152,9 @@ class _NotificationInboxState extends State<NotificationInbox> {
                                         item['message'] as String? ?? '',
                                       ),
                                       const SizedBox(height: 6),
-                                      Text(_date(item['createdAt'])),
-                                      if (!read) const Text('탭하여 읽음으로 표시'),
+                                      WordSafeText(_date(item['createdAt'])),
+                                      if (!read)
+                                        const WordSafeText('탭하여 읽음으로 표시'),
                                     ],
                                   ),
                                   onTap: read || _saving

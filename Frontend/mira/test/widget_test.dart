@@ -246,23 +246,22 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('콩이의 방'), findsOneWidget);
-    expect(find.text('아기'), findsOneWidget);
-    expect(find.textContaining('Lv.'), findsNothing);
+    expect(find.text('Lv.1 · 아기'), findsOneWidget);
     expect(find.text('아빠 기다리기'), findsNothing);
-    await tester.tap(find.text('엄마 기다리기'));
+    await tester.tap(find.textContaining('엄마 기다리기'));
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('엄마 씻고 싶어요!'), findsOneWidget);
     expect(find.byKey(const ValueKey('entrance-background')), findsOneWidget);
     await tester.pumpWidget(room(null));
     await tester.pump();
-    expect(find.text('엄마 기다리기'), findsNothing);
+    expect(find.textContaining('엄마 기다리기'), findsNothing);
     expect(find.text('엄마 씻고 싶어요!'), findsNothing);
     expect(find.byKey(const ValueKey('room-background')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     dog.dispose();
   });
 
-  testWidgets('강아지 상태 문구와 느낌표가 가족 대화로 연결된다', (tester) async {
+  testWidgets('느낌표는 말풍선을 띄우고 채팅 버튼만 대화로 연결된다', (tester) async {
     await phone(tester);
     final dog = DogController(_DogStorage());
     var talks = 0;
@@ -279,9 +278,98 @@ void main() {
     expect(find.text('엄마 기다리는 중!'), findsOneWidget);
     await tester.pump(const Duration(seconds: 6));
     await tester.tap(find.byKey(const ValueKey('dog-speech-toggle')));
-    expect(talks, 1);
+    await tester.pump();
+    expect(talks, 0);
+    expect(find.text('오늘도 같이 있어서 좋아요 ♥'), findsOneWidget);
     await tester.tap(find.text('강아지와 대화하기'));
-    expect(talks, 2);
+    expect(talks, 1);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    dog.dispose();
+  });
+
+  testWidgets('기다리기는 한 명씩 순환하고 완료된 가족은 제외한다', (tester) async {
+    await phone(tester);
+    final dog = DogController(_DogStorage());
+    final mom = CareReminder('mom', '엄마', careActions[0], 'today');
+    final dad = CareReminder('dad', '아빠', careActions[2], 'today');
+    Widget room(List<CareReminder> reminders) => MaterialApp(
+      home: DogRoomScreen(controller: dog, careReminders: reminders),
+    );
+    await tester.pumpWidget(room([mom, dad]));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('엄마 기다리기'), findsOneWidget);
+    expect(find.text('아빠 기다리기'), findsNothing);
+    await tester.tap(find.text('엄마 기다리기'));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('방으로 돌아가기'));
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(find.text('아빠 기다리기'), findsOneWidget);
+    expect(find.text('엄마 기다리기'), findsNothing);
+    await tester.tap(find.textContaining('아빠 기다리기'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('아빠 같이 놀고 싶어요!'), findsOneWidget);
+    await tester.pumpWidget(room([dad]));
+    expect(find.byKey(const ValueKey('entrance-background')), findsOneWidget);
+    await tester.pumpWidget(room([]));
+    expect(find.byKey(const ValueKey('room-background')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    dog.dispose();
+  });
+
+  testWidgets('느낌표는 현재 사용자를 부르고 다른 가족의 역할을 혼동하지 않는다', (tester) async {
+    await phone(tester);
+    final dog = DogController(_DogStorage());
+    final mom = CareReminder('mom', '엄마', careActions[0], 'today');
+    Widget room(String uid, String address) => MaterialApp(
+      home: DogRoomScreen(
+        controller: dog,
+        careReminders: [mom],
+        viewerUid: uid,
+        viewerAddress: address,
+      ),
+    );
+    await tester.pumpWidget(room('daughter', '누나'));
+    await tester.pump(const Duration(seconds: 6));
+    await tester.tap(find.byKey(const ValueKey('dog-speech-toggle')));
+    await tester.pump();
+    expect(find.text('누나, 오늘도 같이 있어서 좋아요 ♥'), findsOneWidget);
+    expect(find.text('엄마 배고파요!'), findsNothing);
+    await tester.pumpWidget(room('mom', '엄마'));
+    expect(find.text('엄마 기다리기'), findsNothing);
+    await tester.pump(const Duration(seconds: 6));
+    await tester.tap(find.byKey(const ValueKey('dog-speech-toggle')));
+    await tester.pump();
+    expect(find.text('엄마, 배고파요!'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    dog.dispose();
+  });
+
+  testWidgets('Lv.6 진입은 예고 후 성장하고 옷장을 해금한다', (tester) async {
+    await phone(tester);
+    final save = _DogStorage()
+      ..state = DogState(experience: 995, lastUpdated: DateTime.now());
+    final dog = DogController(save);
+    await tester.pumpWidget(MaterialApp(home: DogRoomScreen(controller: dog)));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('옷장 · Lv.6에 해금'), findsOneWidget);
+    await tester.tap(find.text('놀기'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 4400));
+    expect(find.text('어라… 몸이 이상해요..! 간질간질해요!'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1800));
+    expect(find.textContaining('뿅! Lv.6'), findsOneWidget);
+    expect(find.textContaining('옷장과 분홍 리본 해금!'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1200));
+    await tester.tap(find.text('옷장 · 성장 선물'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('옷장 · 분홍 리본'));
+    await tester.pump();
+    expect(dog.state.accessory, 'ribbon');
+    expect(save.state!.accessory, 'ribbon');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     dog.dispose();
