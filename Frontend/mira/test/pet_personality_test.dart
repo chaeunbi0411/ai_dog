@@ -55,7 +55,7 @@ void main() {
       isNull,
     );
     for (var i = 0; i < 4; i++) {
-      await tester.tap(find.text(PetPersonality.options[i][i % 3]));
+      await tester.tap(find.bySemanticsLabel(PetPersonality.options[i][i % 3]));
       await tester.pump();
       await tester.tap(find.text(i == 3 ? '성격 결과 적용' : '다음'));
       await tester.pumpAndSettle();

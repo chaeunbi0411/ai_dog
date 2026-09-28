@@ -6,6 +6,7 @@ import '../services/ai_server_service.dart';
 import '../services/family_service.dart';
 import '../services/mood_service.dart';
 import '../services/notification_service.dart';
+import '../widgets/word_wrap_text.dart';
 
 /// 홈 화면 "오늘의 감정 한 줄 기록"에서 여는 비공개 감정 일기.
 /// FamilyPage의 "오늘의 마음 기록"(moments)과 달리 원문은 가족에게 보이지 않고,
@@ -24,7 +25,17 @@ Future<void> showMoodDiarySheet(BuildContext context) async {
     ).showSnackBar(const SnackBar(content: Text('로그인 후 이용할 수 있어요.')));
     return;
   }
-  final familyId = await FamilyService.instance.fetchMyFamilyId(uid);
+  String? familyId;
+  try {
+    familyId = await FamilyService.instance.fetchMyFamilyId(uid);
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('가족 정보를 불러오지 못했어요. 다시 시도해주세요.')),
+      );
+    }
+    return;
+  }
   if (familyId == null) {
     if (context.mounted) {
       ScaffoldMessenger.of(
@@ -34,11 +45,25 @@ Future<void> showMoodDiarySheet(BuildContext context) async {
     return;
   }
   if (!context.mounted) return;
-  await showModalBottomSheet(
+  final result = await showModalBottomSheet<MoodAnalysisResult>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => _MoodDiarySheet(uid: uid, familyId: familyId),
+    builder: (_) => _MoodDiarySheet(uid: uid, familyId: familyId!),
+  );
+  if (!context.mounted || result == null) return;
+  await showDialog<void>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('오늘의 기록을 남겼어요'),
+      content: SingleChildScrollView(child: WordWrapText(result.selfMessage)),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(c),
+          child: const Text('확인'),
+        ),
+      ],
+    ),
   );
 }
 
@@ -64,6 +89,7 @@ class _MoodDiarySheetState extends State<_MoodDiarySheet> {
   }
 
   Future<void> _submit() async {
+    if (_submitting) return;
     final text = _textController.text.trim();
     if (text.isEmpty) {
       setState(() => _error = '오늘 기분을 한 줄로 적어주세요.');
@@ -108,40 +134,31 @@ class _MoodDiarySheetState extends State<_MoodDiarySheet> {
 
       if (result.isNegative) {
         for (final doc in others) {
-          await NotificationService.instance.sendMoodAlert(
-            toUserId: doc.id,
-            message: result.familyMessage,
-            relatedMoodId: moodId,
-          );
+          try {
+            await NotificationService.instance.sendMoodAlert(
+              toUserId: doc.id,
+              message: result.familyMessage,
+              relatedMoodId: moodId,
+            );
+          } catch (_) {
+            // The diary is already saved; retrying submission would duplicate it.
+          }
         }
       }
 
       if (!mounted) return;
-      Navigator.pop(context);
-      await showDialog<void>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: const Text('오늘의 기록을 남겼어요'),
-          content: Text(result.selfMessage),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(c),
-              child: const Text('확인'),
-            ),
-          ],
-        ),
-      );
+      Navigator.pop(context, result);
     } on AiServerException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     } catch (_) {
-      setState(() => _error = '기록을 저장하지 못했어요. 다시 시도해주세요.');
+      if (mounted) setState(() => _error = '기록을 저장하지 못했어요. 다시 시도해주세요.');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) => SingleChildScrollView(
     padding: EdgeInsets.fromLTRB(
       22,
       5,
@@ -157,7 +174,7 @@ class _MoodDiarySheetState extends State<_MoodDiarySheet> {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 6),
-        const Text(
+        const WordWrapText(
           '나만 보는 기록이에요. 가족에게는 원문 대신 AI가 정리한 짧은 소식만 전해져요.',
           style: TextStyle(color: Colors.black54, fontSize: 13),
         ),
@@ -170,7 +187,9 @@ class _MoodDiarySheetState extends State<_MoodDiarySheet> {
                 (tag) => ChoiceChip(
                   label: Text(tag),
                   selected: _moodTag == tag,
-                  onSelected: (_) => setState(() => _moodTag = tag),
+                  onSelected: _submitting
+                      ? null
+                      : (_) => setState(() => _moodTag = tag),
                 ),
               )
               .toList(),
@@ -178,6 +197,8 @@ class _MoodDiarySheetState extends State<_MoodDiarySheet> {
         const SizedBox(height: 12),
         TextField(
           controller: _textController,
+          enabled: !_submitting,
+          maxLength: 2000,
           maxLines: 4,
           decoration: const InputDecoration(
             hintText: '오늘 있었던 일과 기분을 편하게 적어보세요.',

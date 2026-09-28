@@ -30,6 +30,9 @@ class AuthService {
 
   Future<void> signOut() => _auth.signOut();
 
+  Future<void> sendPasswordReset(String email) =>
+      _auth.sendPasswordResetEmail(email: email.trim());
+
   String messageFor(FirebaseAuthException e) {
     switch (e.code) {
       case 'email-already-in-use':

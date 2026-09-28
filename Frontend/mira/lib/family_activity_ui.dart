@@ -247,8 +247,11 @@ class _AiPageState extends State<AiPage> {
   /// "소통 신호" 카드. 인사이트 탭을 열 때 한 번만 계산해서, 매번 다시 만들지
   /// 않고 이후 채팅 질문에도 같은 교류 데이터를 함께 넘겨준다.
   Future<void> _loadSignal(FamilyActivity data) async {
-    if (data.members.length < 2) return;
-    setState(() => _signalBusy = true);
+    if (!mounted || data.members.length < 2) return;
+    setState(() {
+      _signalBusy = true;
+      _signalError = null;
+    });
     try {
       final matrix = await FamilyInteractionService.instance.build(
         familyId: data.familyId,
@@ -273,6 +276,7 @@ class _AiPageState extends State<AiPage> {
       if (mounted) setState(() => _signalBusy = false);
     }
   }
+
   void _scrollToEnd() => WidgetsBinding.instance.addPostFrameCallback((_) {
     if (_scroll.hasClients) {
       _scroll.animateTo(
@@ -330,190 +334,190 @@ class _AiPageState extends State<AiPage> {
   @override
   Widget build(BuildContext context) => _ActivityBuilder(
     builder: (context, data) {
-      if (!_signalRequested) {
+      if (!_signalRequested && data.members.length >= 2) {
         _signalRequested = true;
         WidgetsBinding.instance.addPostFrameCallback((_) => _loadSignal(data));
       }
       return Column(
-      children: [
-        Expanded(
-          child: AppPage(
-            title: 'MIRA 인사이트',
-            controller: _scroll,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: ink,
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        CupertinoIcons.sparkles,
-                        color: Color(0xFFDCD8FF),
-                        size: 28,
-                      ),
-                      const SizedBox(height: 16),
-                      const WordWrapText(
-                        '우리 가족의 이야기를 함께 살펴봐요.',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          height: 1.3,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '이번 주 공유 글 ${data.weekMoments.length} · 사진 ${data.weekPhotos.length} · 돌봄 ${data.careCount}',
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Section('살펴볼 신호', '이번 주'),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
+        children: [
+          Expanded(
+            child: AppPage(
+              title: 'MIRA 인사이트',
+              controller: _scroll,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: ink,
+                      borderRadius: BorderRadius.circular(28),
+                    ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Insight(
-                          '이야기 나눔',
-                          '${data.participants}명',
-                          '이번 주 이야기를 남긴 가족',
+                        const Icon(
+                          CupertinoIcons.sparkles,
+                          color: Color(0xFFDCD8FF),
+                          size: 28,
                         ),
-                        const Divider(height: 28),
-                        Insight(
-                          '함께한 돌봄',
-                          '${data.careCount}회',
-                          '실제로 완료한 강아지 돌봄',
+                        const SizedBox(height: 16),
+                        const WordWrapText(
+                          '우리 가족의 이야기를 함께 살펴봐요.',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            height: 1.3,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                        const Divider(height: 28),
-                        Insight(
-                          '가족의 반응',
-                          '${data.likes}개',
-                          '이번 주 글과 사진에 남은 좋아요',
+                        const SizedBox(height: 10),
+                        Text(
+                          '이번 주 공유 글 ${data.weekMoments.length} · 사진 ${data.weekPhotos.length} · 돌봄 ${data.careCount}',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                if (data.members.length >= 2) ...[
                   const SizedBox(height: 20),
-                  const Section('AI 소통 신호', '최근 4주'),
+                  const Section('살펴볼 신호', '이번 주'),
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Column(
                         children: [
-                          const Icon(
-                            CupertinoIcons.heart_circle,
-                            color: violet,
+                          Insight(
+                            '이야기 나눔',
+                            '${data.participants}명',
+                            '이번 주 이야기를 남긴 가족',
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _signalError != null
-                                ? Text(
-                                    _signalError!,
-                                    style: const TextStyle(
-                                      color: Colors.black54,
-                                    ),
-                                  )
-                                : Text(
-                                    _signal ??
-                                        (_signalBusy
-                                            ? '가족의 댓글·좋아요를 살펴보고 있어요…'
-                                            : '아직 살펴볼 만큼 교류가 쌓이지 않았어요.'),
-                                    style: const TextStyle(height: 1.5),
-                                  ),
+                          const Divider(height: 28),
+                          Insight(
+                            '함께한 돌봄',
+                            '${data.careCount}회',
+                            '실제로 완료한 강아지 돌봄',
+                          ),
+                          const Divider(height: 28),
+                          Insight(
+                            '가족의 반응',
+                            '${data.likes}개',
+                            '이번 주 글과 사진에 남은 좋아요',
                           ),
                         ],
                       ),
                     ),
                   ),
-                ],
-                const SizedBox(height: 20),
-                const Text(
-                  '가족이 공유한 이야기와 프로필을 참고해 대화해요.',
-                  style: TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-                const SizedBox(height: 20),
-                if (_history.isEmpty && _pending == null)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      '궁금한 이야기를 편하게 건네주세요.',
-                      style: TextStyle(color: Colors.black45),
-                    ),
-                  ),
-                for (final turn in _history)
-                  _InsightBubble(
-                    text: turn['text']!,
-                    mine: turn['role'] == 'user',
-                  ),
-                if (_pending != null)
-                  _InsightBubble(text: _pending!, mine: true),
-                if (_busy)
-                  const _InsightBubble(text: '답변을 생각하고 있어요…', mine: false),
-                if (_error != null)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                            fontSize: 12,
-                          ),
+                  if (data.members.length >= 2) ...[
+                    const SizedBox(height: 20),
+                    const Section('AI 소통 신호', '최근 4주'),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              CupertinoIcons.heart_circle,
+                              color: violet,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _signalError != null
+                                  ? WordWrapText(
+                                      _signalError!,
+                                      style: const TextStyle(
+                                        color: Colors.black54,
+                                      ),
+                                    )
+                                  : WordWrapText(
+                                      _signal ??
+                                          (_signalBusy
+                                              ? '가족의 댓글·좋아요를 살펴보고 있어요…'
+                                              : '아직 살펴볼 만큼 교류가 쌓이지 않았어요.'),
+                                      style: const TextStyle(height: 1.5),
+                                    ),
+                            ),
+                          ],
                         ),
                       ),
-                      TextButton(
-                        onPressed: () => _send(data, retry: _pending),
-                        child: const Text('다시 보내기'),
-                      ),
-                    ],
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  const Text(
+                    '가족이 공유한 이야기와 프로필을 참고해 대화해요.',
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),
-              ],
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            border: const Border(top: BorderSide(color: Color(0xFFEAE6DF))),
-          ),
-          child: TextField(
-            controller: _input,
-            enabled: !_busy,
-            maxLength: 1000,
-            minLines: 1,
-            maxLines: 3,
-            textInputAction: TextInputAction.send,
-            onSubmitted: (_) => _send(data),
-            decoration: InputDecoration(
-              counterText: '',
-              hintText: 'MIRA에게 이야기하기',
-              suffixIcon: IconButton(
-                tooltip: '보내기',
-                onPressed: _busy ? null : () => _send(data),
-                icon: const Icon(Icons.arrow_upward_rounded),
+                  const SizedBox(height: 20),
+                  if (_history.isEmpty && _pending == null)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        '궁금한 이야기를 편하게 건네주세요.',
+                        style: TextStyle(color: Colors.black45),
+                      ),
+                    ),
+                  for (final turn in _history)
+                    _InsightBubble(
+                      text: turn['text']!,
+                      mine: turn['role'] == 'user',
+                    ),
+                  if (_pending != null)
+                    _InsightBubble(text: _pending!, mine: true),
+                  if (_busy)
+                    const _InsightBubble(text: '답변을 생각하고 있어요…', mine: false),
+                  if (_error != null)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _error!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => _send(data, retry: _pending),
+                          child: const Text('다시 보내기'),
+                        ),
+                      ],
+                    ),
+                ],
               ),
             ),
           ),
-        ),
-      ],
-    );
+          Container(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              border: const Border(top: BorderSide(color: Color(0xFFEAE6DF))),
+            ),
+            child: TextField(
+              controller: _input,
+              enabled: !_busy,
+              maxLength: 1000,
+              minLines: 1,
+              maxLines: 3,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _send(data),
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: 'MIRA에게 이야기하기',
+                suffixIcon: IconButton(
+                  tooltip: '보내기',
+                  onPressed: _busy ? null : () => _send(data),
+                  icon: const Icon(Icons.arrow_upward_rounded),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
     },
   );
 }
@@ -546,7 +550,9 @@ class _InsightBubble extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            SelectableText(text, style: const TextStyle(height: 1.6)),
+            SelectionArea(
+              child: WordWrapText(text, style: const TextStyle(height: 1.6)),
+            ),
           ],
         ),
       ),

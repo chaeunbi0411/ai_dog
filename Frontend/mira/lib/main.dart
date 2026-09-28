@@ -32,6 +32,9 @@ import 'services/notification_service.dart';
 import 'services/pet_service.dart';
 import 'widgets/author_avatar.dart';
 import 'widgets/word_wrap_text.dart';
+import 'auth/password_reset_screen.dart';
+import 'notifications/notification_inbox.dart';
+import 'widgets/story_filters.dart';
 
 part 'family_activity_ui.dart';
 part 'moment_editor.dart';
@@ -446,6 +449,7 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool signup = false;
   bool _submitting = false;
+  bool _showPassword = false;
   String? _errorText;
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -462,8 +466,13 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _handleSubmit() async {
+    if (_submitting) return;
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+    if (signup && _nameController.text.trim().isEmpty) {
+      setState(() => _errorText = '이름을 입력해주세요.');
+      return;
+    }
     if (email.isEmpty || password.isEmpty) {
       setState(() => _errorText = '이메일과 비밀번호를 입력해주세요');
       return;
@@ -487,9 +496,15 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         await AuthService.instance.signIn(email: email, password: password);
       }
-      widget.onDone();
+      if (mounted) widget.onDone();
     } on FirebaseAuthException catch (e) {
-      setState(() => _errorText = AuthService.instance.messageFor(e));
+      if (mounted) {
+        setState(() => _errorText = AuthService.instance.messageFor(e));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorText = '로그인 정보를 저장하지 못했어요. 연결을 확인하고 다시 시도해주세요.');
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -549,17 +564,30 @@ class _AuthScreenState extends State<AuthScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
+              enabled: !_submitting,
+              obscureText: !_showPassword,
+              onSubmitted: (_) {
+                if (!signup) _handleSubmit();
+              },
+              decoration: InputDecoration(
                 labelText: '비밀번호',
-                prefixIcon: Icon(CupertinoIcons.lock),
+                prefixIcon: const Icon(CupertinoIcons.lock),
+                suffixIcon: IconButton(
+                  tooltip: _showPassword ? '비밀번호 숨기기' : '비밀번호 보기',
+                  onPressed: () =>
+                      setState(() => _showPassword = !_showPassword),
+                  icon: Icon(
+                    _showPassword ? Icons.visibility_off : Icons.visibility,
+                  ),
+                ),
               ),
             ),
             if (signup) ...[
               const SizedBox(height: 12),
               TextField(
                 controller: _passwordConfirmController,
-                obscureText: true,
+                obscureText: !_showPassword,
+                enabled: !_submitting,
                 decoration: const InputDecoration(
                   labelText: '비밀번호 확인',
                   prefixIcon: Icon(CupertinoIcons.lock),
@@ -592,9 +620,29 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
             const SizedBox(height: 12),
+            if (!signup)
+              Center(
+                child: TextButton(
+                  onPressed: _submitting
+                      ? null
+                      : () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => PasswordResetScreen(
+                              email: _emailController.text.trim(),
+                            ),
+                          ),
+                        ),
+                  child: const Text('비밀번호를 잊으셨나요?'),
+                ),
+              ),
             Center(
               child: TextButton(
-                onPressed: () => setState(() => signup = !signup),
+                onPressed: _submitting
+                    ? null
+                    : () => setState(() {
+                        signup = !signup;
+                        _errorText = null;
+                      }),
                 child: Text(signup ? '이미 계정이 있어요 · 로그인' : '처음이신가요? · 회원가입'),
               ),
             ),
@@ -1307,7 +1355,7 @@ class _MainShellState extends State<MainShell> {
       builder: (context) => AlertDialog(
         title: const Text('기기에 저장한 데이터를 삭제할까요?'),
         content: const Text(
-          '사진·글·댓글·좋아요와 강아지 성장, 안내 확인 기록이 삭제돼요. 원본 사진은 지워지지 않아요.',
+          '이 기기의 강아지 성장·캐릭터 이미지·글자 크기·안내 확인 기록을 초기화해요. 가족에게 공유한 글과 사진, 계정은 유지돼요.',
         ),
         actions: [
           TextButton(
@@ -1325,9 +1373,11 @@ class _MainShellState extends State<MainShell> {
     try {
       final prefs = SharedPreferencesAsync();
       await dog.flush();
-      for (final key in ['dog_state_v1', privacyKey]) {
+      for (final key in ['dog_state_v1', privacyKey, textScaleKey]) {
         await prefs.remove(key);
       }
+      await CharacterSaveService.instance.clear();
+      textScaleNotifier.value = 1;
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute<void>(builder: (_) => const AppFlow()),
@@ -1582,8 +1632,16 @@ class AppPage extends StatelessWidget {
 
 /// 다른 가족 구성원이 "오늘의 감정 한 줄 기록"에서 힘든 마음을 남기면,
 /// AI가 요약한 소식을 화면 어디에 있든 팝업으로 보여준다.
-class _MoodAlertListener extends StatelessWidget {
+class _MoodAlertListener extends StatefulWidget {
   const _MoodAlertListener();
+  @override
+  State<_MoodAlertListener> createState() => _MoodAlertListenerState();
+}
+
+class _MoodAlertListenerState extends State<_MoodAlertListener> {
+  final _presented = <String>{};
+  bool _showing = false;
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _notifications;
 
   @override
   Widget build(BuildContext context) {
@@ -1592,33 +1650,48 @@ class _MoodAlertListener extends StatelessWidget {
     final uid = currentUidOrNull();
     if (uid == null) return const SizedBox.shrink();
     return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-      stream: NotificationService.instance.watchUnread(uid),
+      stream: _notifications ??= NotificationService.instance.watchUnread(uid),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           // Firestore 색인 누락 등으로 쿼리가 실패하면 알림이 조용히 사라지는 대신
           // 콘솔에 남겨서 원인을 바로 찾을 수 있게 한다.
           debugPrint('알림을 불러오지 못했어요: ${snapshot.error}');
         }
-        final docs = snapshot.data ?? const [];
-        if (docs.isEmpty) return const SizedBox.shrink();
+        final docs =
+            (snapshot.data ??
+                    const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+                .where((d) => !_presented.contains(d.id))
+                .toList();
+        if (docs.isEmpty || _showing) return const SizedBox.shrink();
         final first = docs.first;
+        _showing = true;
+        _presented.add(first.id);
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!context.mounted) return;
-          await NotificationService.instance.markRead(uid, first.id);
-          if (!context.mounted) return;
-          await showDialog<void>(
-            context: context,
-            builder: (c) => AlertDialog(
-              title: Text(first.data()['title'] as String? ?? '가족 소식'),
-              content: Text(first.data()['message'] as String? ?? ''),
-              actions: [
-                FilledButton(
-                  onPressed: () => Navigator.pop(c),
-                  child: const Text('확인'),
+          try {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (c) => AlertDialog(
+                title: Text(first.data()['title'] as String? ?? '가족 소식'),
+                content: SingleChildScrollView(
+                  child: WordWrapText(first.data()['message'] as String? ?? ''),
                 ),
-              ],
-            ),
-          );
+                actions: [
+                  FilledButton(
+                    onPressed: () => Navigator.pop(c, true),
+                    child: const Text('확인'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true) {
+              await NotificationService.instance.markRead(uid, first.id);
+            }
+          } catch (_) {
+            // Reading can be retried from the inbox without blocking the app.
+          } finally {
+            if (mounted) setState(() => _showing = false);
+          }
         });
         return const SizedBox.shrink();
       },
@@ -1980,142 +2053,183 @@ Future<void> _showCommentsSheet({
 }) async {
   final uid = FirebaseAuth.instance.currentUser?.uid;
   final controller = TextEditingController();
+  var sending = false;
+  var sheetOpen = true;
+  ModalRoute<dynamic>? sheetRoute;
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
-      ),
-      child: SizedBox(
-        height: MediaQuery.sizeOf(sheetContext).height * 0.7,
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: Text(
-                '댓글',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+    builder: (sheetContext) {
+      sheetRoute = ModalRoute.of(sheetContext);
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+        ),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.7,
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '댓글',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                ),
               ),
-            ),
-            Expanded(
-              child:
-                  StreamBuilder<
-                    List<QueryDocumentSnapshot<Map<String, dynamic>>>
-                  >(
-                    stream: MomentService.instance.watchComments(
-                      familyId,
-                      momentId,
-                    ),
-                    initialData: comments,
-                    builder: (context, snapshot) {
-                      final docs = snapshot.data ?? const [];
-                      if (docs.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            '아직 댓글이 없어요.',
-                            style: TextStyle(color: Colors.black54),
-                          ),
-                        );
-                      }
-                      return ListView(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        children: [
-                          for (final doc in docs)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  AuthorAvatar(
-                                    uid: doc.data()['authorUid'] as String?,
-                                    role: doc.data()['authorRole'] as String?,
-                                    radius: 16,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          doc.data()['authorName'] as String? ??
-                                              '이름 없음',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        Text(
-                                          doc.data()['text'] as String? ?? '',
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-            ),
-            if (uid != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        decoration: const InputDecoration(
-                          hintText: '댓글을 입력하세요',
-                        ),
+              Expanded(
+                child:
+                    StreamBuilder<
+                      List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                    >(
+                      stream: MomentService.instance.watchComments(
+                        familyId,
+                        momentId,
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(CupertinoIcons.paperplane_fill),
-                      onPressed: () async {
-                        final text = controller.text.trim();
-                        if (text.isEmpty) return;
-                        final profile = await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(uid)
-                            .get();
-                        final myRole = profile.data()?['role'] as String? ?? '';
-                        await MomentService.instance.addComment(
-                          familyId: familyId,
-                          momentId: momentId,
-                          authorUid: uid,
-                          authorName: profile.data()?['name'] as String? ?? '이름 없음',
-                          authorRole: myRole,
-                          text: text,
-                        );
-                        if (momentAuthorUid != null && momentAuthorUid != uid) {
-                          unawaited(
-                            NotificationService.instance.sendCommentAlert(
-                              toUserId: momentAuthorUid,
-                              fromRole: myRole,
-                              relatedId: momentId,
+                      initialData: comments,
+                      builder: (context, snapshot) {
+                        final docs = snapshot.data ?? const [];
+                        if (docs.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              '아직 댓글이 없어요.',
+                              style: TextStyle(color: Colors.black54),
                             ),
                           );
                         }
-                        controller.clear();
+                        return ListView(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          children: [
+                            for (final doc in docs)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 14),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    AuthorAvatar(
+                                      uid: doc.data()['authorUid'] as String?,
+                                      role: doc.data()['authorRole'] as String?,
+                                      radius: 16,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            doc.data()['authorName']
+                                                    as String? ??
+                                                '이름 없음',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          WordWrapText(
+                                            doc.data()['text'] as String? ?? '',
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        );
                       },
                     ),
-                  ],
-                ),
               ),
-          ],
+              if (uid != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          decoration: const InputDecoration(
+                            hintText: '댓글을 입력하세요',
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(CupertinoIcons.paperplane_fill),
+                        onPressed: () async {
+                          final text = controller.text.trim();
+                          if (text.isEmpty || sending) return;
+                          sending = true;
+                          try {
+                            final profile = await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(uid)
+                                .get();
+                            final myRole =
+                                profile.data()?['role'] as String? ?? '';
+                            await MomentService.instance.addComment(
+                              familyId: familyId,
+                              momentId: momentId,
+                              authorUid: uid,
+                              authorName:
+                                  profile.data()?['name'] as String? ?? '이름 없음',
+                              authorRole: myRole,
+                              text: text,
+                            );
+                            if (momentAuthorUid != null &&
+                                momentAuthorUid != uid) {
+                              unawaited(
+                                NotificationService.instance
+                                    .sendCommentAlert(
+                                      toUserId: momentAuthorUid,
+                                      fromRole: myRole,
+                                      relatedId: momentId,
+                                    )
+                                    .catchError((Object _) {}),
+                              );
+                            }
+                            if (sheetOpen && controller.text.trim() == text) {
+                              controller.clear();
+                            }
+                          } catch (_) {
+                            if (sheetOpen && sheetContext.mounted) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text('댓글을 저장하지 못했어요. 다시 시도해주세요.'),
+                                ),
+                              );
+                            }
+                          } finally {
+                            sending = false;
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
+  sheetOpen = false;
+  await sheetRoute?.completed;
   controller.dispose();
 }
 
-class _MomentsSection extends StatelessWidget {
+class _MomentsSection extends StatefulWidget {
   const _MomentsSection();
+  @override
+  State<_MomentsSection> createState() => _MomentsSectionState();
+}
+
+class _MomentsSectionState extends State<_MomentsSection> {
+  String _query = '';
+  StoryFilter _filter = StoryFilter.all;
+  late final String? _uid = currentUidOrNull();
+  late final Future<String?> _family = _uid == null
+      ? Future.value(null)
+      : FamilyService.instance.fetchMyFamilyId(_uid);
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _moments;
 
   @override
   Widget build(BuildContext context) {
@@ -2127,8 +2241,11 @@ class _MomentsSection extends StatelessWidget {
       );
     }
     return FutureBuilder<String?>(
-      future: FamilyService.instance.fetchMyFamilyId(uid),
+      future: _family,
       builder: (context, familyIdSnapshot) {
+        if (familyIdSnapshot.hasError) {
+          return const WordWrapText('가족 정보를 불러오지 못했어요. 연결을 확인해주세요.');
+        }
         final familyId = familyIdSnapshot.data;
         if (familyIdSnapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
@@ -2143,8 +2260,12 @@ class _MomentsSection extends StatelessWidget {
           );
         }
         return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-          stream: MomentService.instance.watchMoments(familyId),
+          stream: _moments ??= MomentService.instance.watchMoments(familyId),
           builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const WordWrapText('가족 이야기를 불러오지 못했어요. 연결을 확인해주세요.');
+            }
+            if (!snapshot.hasData) return const LinearProgressIndicator();
             final docs = snapshot.data ?? const [];
             if (docs.isEmpty) {
               return const Text(
@@ -2154,7 +2275,22 @@ class _MomentsSection extends StatelessWidget {
             }
             return Column(
               children: [
-                for (final doc in docs) ...[
+                StoryFilters(
+                  onChanged: (query, filter) => setState(() {
+                    _query = query;
+                    _filter = filter;
+                  }),
+                ),
+                if (!docs.any(
+                  (d) => matchesStory(d.data(), _query, _filter, uid),
+                ))
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('조건에 맞는 이야기가 없어요.'),
+                  ),
+                for (final doc in docs.where(
+                  (d) => matchesStory(d.data(), _query, _filter, uid),
+                )) ...[
                   Builder(
                     builder: (context) {
                       final data = doc.data();
@@ -2316,23 +2452,25 @@ class DiaryCard extends StatelessWidget {
             children: [
               AuthorAvatar(uid: authorUid, role: authorRole),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    mood,
-                    style: const TextStyle(fontSize: 12, color: violet),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    WordWrapText(
+                      name,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    WordWrapText(
+                      mood,
+                      style: const TextStyle(fontSize: 12, color: violet),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
           const SizedBox(height: 15),
-          Text(body, style: const TextStyle(height: 1.6)),
+          WordWrapText(body, style: const TextStyle(height: 1.6)),
           const Divider(height: 28),
           Row(
             children: [
@@ -2413,8 +2551,19 @@ class SettingsPage extends StatelessWidget {
               ),
               setting(
                 CupertinoIcons.bell,
-                '알림',
-                '돌봄 · 댓글 · 일정',
+                '알림함',
+                '받은 소식 · 읽음 관리',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        NotificationInbox(userId: currentUidOrNull()),
+                  ),
+                ),
+              ),
+              setting(
+                CupertinoIcons.bell,
+                '알림 설정',
+                '돌봄 · 댓글',
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => const NotificationSettingsScreen(),
@@ -2437,7 +2586,7 @@ class SettingsPage extends StatelessWidget {
               ListTile(
                 leading: const Icon(CupertinoIcons.trash),
                 title: const Text('기기에 저장한 데이터 삭제'),
-                subtitle: const Text('사진첩 · 강아지 성장 · 안내 확인 기록'),
+                subtitle: const WordWrapText('기기 설정 초기화 · 가족 공유 기록은 유지'),
                 onTap: onClearData,
               ),
             ],
@@ -2769,11 +2918,14 @@ class NotificationSettingsScreen extends StatefulWidget {
       _NotificationSettingsScreenState();
 }
 
-class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
+class _NotificationSettingsScreenState
+    extends State<NotificationSettingsScreen> {
   bool _care = true;
   bool _comment = true;
   bool _schedule = true;
   bool _loading = true;
+  bool _saving = false;
+  String? _error;
 
   @override
   void initState() {
@@ -2789,21 +2941,47 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       if (mounted) setState(() => _loading = false);
       return;
     }
-    final doc = await NotificationService.instance.fetchPreferences(uid);
-    if (mounted) {
-      setState(() {
-        _care = doc['careEnabled'] as bool? ?? true;
-        _comment = doc['commentEnabled'] as bool? ?? true;
-        _schedule = doc['scheduleEnabled'] as bool? ?? true;
-        _loading = false;
-      });
+    try {
+      final doc = await NotificationService.instance.fetchPreferences(uid);
+      if (mounted) {
+        setState(() {
+          _care = doc['careEnabled'] as bool? ?? true;
+          _comment = doc['commentEnabled'] as bool? ?? true;
+          _schedule = doc['scheduleEnabled'] as bool? ?? true;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = '알림 설정을 불러오지 못했어요. 다시 시도해주세요.';
+        });
+      }
     }
   }
 
   Future<void> _save(String key, bool value) async {
     final uid = currentUidOrNull();
-    if (uid == null) return;
-    await NotificationService.instance.setPreference(uid, key, value);
+    if (uid == null || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await NotificationService.instance.setPreference(uid, key, value);
+      if (!mounted) return;
+      setState(() {
+        if (key == 'careEnabled') _care = value;
+        if (key == 'commentEnabled') _comment = value;
+        if (key == 'scheduleEnabled') _schedule = value;
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('설정을 저장하지 못했어요. 다시 시도해주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -2813,32 +2991,48 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         ? const Center(child: CircularProgressIndicator())
         : ListView(
             children: [
+              if (_error != null)
+                ListTile(
+                  title: WordWrapText(_error!),
+                  trailing: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _loading = true;
+                        _error = null;
+                      });
+                      _load();
+                    },
+                    child: const Text('재시도'),
+                  ),
+                ),
               SwitchListTile(
                 title: const Text('돌봄 알림'),
-                subtitle: const Text('내게 오늘의 돌봄이 배정되거나, 가족이 돌봄을 완료하면 알려드려요'),
+                subtitle: const WordWrapText(
+                  '내게 오늘의 돌봄이 배정되거나, 가족이 돌봄을 완료하면 알려드려요',
+                ),
                 value: _care,
-                onChanged: (v) {
-                  setState(() => _care = v);
-                  _save('careEnabled', v);
-                },
+                onChanged:
+                    _saving || _error != null || currentUidOrNull() == null
+                    ? null
+                    : (v) => _save('careEnabled', v),
               ),
               SwitchListTile(
                 title: const Text('댓글 알림'),
-                subtitle: const Text('가족이 내 기록에 댓글을 남기면 알려드려요'),
+                subtitle: const WordWrapText('가족이 내 기록에 댓글을 남기면 알려드려요'),
                 value: _comment,
-                onChanged: (v) {
-                  setState(() => _comment = v);
-                  _save('commentEnabled', v);
-                },
+                onChanged:
+                    _saving || _error != null || currentUidOrNull() == null
+                    ? null
+                    : (v) => _save('commentEnabled', v),
               ),
               SwitchListTile(
                 title: const Text('일정 알림'),
                 subtitle: const Text('다가오는 가족 일정을 알려드려요'),
                 value: _schedule,
-                onChanged: (v) {
-                  setState(() => _schedule = v);
-                  _save('scheduleEnabled', v);
-                },
+                onChanged:
+                    _saving || _error != null || currentUidOrNull() == null
+                    ? null
+                    : (v) => _save('scheduleEnabled', v),
               ),
             ],
           ),
@@ -3260,7 +3454,7 @@ class QuestCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                WordWrapText(
                   title,
                   style: const TextStyle(
                     fontSize: 15,
@@ -3269,7 +3463,7 @@ class QuestCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 5),
-                Text(
+                WordWrapText(
                   detail,
                   style: const TextStyle(
                     fontSize: 11,
@@ -3324,7 +3518,7 @@ class DailyQuest extends StatelessWidget {
           Text(icon, style: const TextStyle(fontSize: 21)),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
+            child: WordWrapText(
               title,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
@@ -3370,7 +3564,7 @@ class CareLine extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(action, overflow: TextOverflow.ellipsis),
+        Flexible(child: WordWrapText(action)),
       ],
     ),
   );
@@ -3404,7 +3598,7 @@ class Metric extends StatelessWidget {
           ),
           if (description.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(
+            WordWrapText(
               description,
               style: const TextStyle(fontSize: 11, color: Colors.black54),
             ),
@@ -3422,20 +3616,20 @@ class Section extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     children: [
       Expanded(
-        child: Text(
+        child: WordWrapText(
           title,
-          overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
       ),
       const SizedBox(width: 12),
-      Text(
-        tail,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          fontSize: 11,
-          color: violet,
-          fontWeight: FontWeight.w700,
+      Flexible(
+        child: WordWrapText(
+          tail,
+          style: const TextStyle(
+            fontSize: 11,
+            color: violet,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     ],
