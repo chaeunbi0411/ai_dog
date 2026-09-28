@@ -21,7 +21,7 @@ class _PetPersonalityQuizState extends State<PetPersonalityQuiz> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          WordSafeText(
             '우리 아이 알아보기 · ${_step + 1} / 4',
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
@@ -61,7 +61,7 @@ class _PetPersonalityQuizState extends State<PetPersonalityQuiz> {
               if (_step > 0)
                 TextButton(
                   onPressed: () => setState(() => _step--),
-                  child: const Text('이전'),
+                  child: const WordSafeText('이전'),
                 ),
               const Spacer(),
               FilledButton(
@@ -77,7 +77,7 @@ class _PetPersonalityQuizState extends State<PetPersonalityQuiz> {
                           );
                         }
                       },
-                child: Text(_step == 3 ? '성격 결과 적용' : '다음'),
+                child: WordSafeText(_step == 3 ? '성격 결과 적용' : '다음'),
               ),
             ],
           ),

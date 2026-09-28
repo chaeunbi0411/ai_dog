@@ -22,16 +22,16 @@ Future<void> deleteMoment(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (c) => AlertDialog(
-      title: const Text('이 마음 기록을 삭제할까요?'),
-      content: const Text('삭제한 글은 가족 피드에서 사라져요.'),
+      title: const WordSafeText('이 마음 기록을 삭제할까요?'),
+      content: const WordSafeText('삭제한 글은 가족 피드에서 사라져요.'),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(c, false),
-          child: const Text('취소'),
+          child: const WordSafeText('취소'),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(c, true),
-          child: const Text('삭제'),
+          child: const WordSafeText('삭제'),
         ),
       ],
     ),
@@ -42,7 +42,7 @@ Future<void> deleteMoment(
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('삭제하지 못했어요. 연결과 수정 권한을 확인해주세요.')),
+        const SnackBar(content: WordSafeText('삭제하지 못했어요. 연결과 수정 권한을 확인해주세요.')),
       );
     }
   }
@@ -114,7 +114,7 @@ class _MomentEditorState extends State<_MomentEditor> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          const WordSafeText(
             '마음 기록 수정',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           ),
@@ -135,13 +135,13 @@ class _MomentEditorState extends State<_MomentEditor> {
             decoration: const InputDecoration(labelText: '가족과 나눌 이야기'),
           ),
           if (_error != null)
-            Text(_error!, style: const TextStyle(color: Colors.red)),
+            WordSafeText(_error!, style: const TextStyle(color: Colors.red)),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: _busy ? null : _save,
-              child: Text(_busy ? '저장 중…' : '저장하기'),
+              child: WordSafeText(_busy ? '저장 중…' : '저장하기'),
             ),
           ),
         ],

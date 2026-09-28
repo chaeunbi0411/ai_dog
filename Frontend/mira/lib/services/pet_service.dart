@@ -28,6 +28,8 @@ class PetService {
     required String breed,
     required String colorDescription,
     required String personality,
+    String? gender,
+    String? preferredAddress,
     Map<String, dynamic>? personalityProfile,
   }) {
     return _doc(familyId).set({
@@ -35,6 +37,9 @@ class PetService {
       'breed': breed,
       'colorDescription': colorDescription,
       'personality': personality,
+      'gender': ?gender,
+      if (preferredAddress != null)
+        'addresses': {updatedByUid: preferredAddress.trim()},
       'personalityProfile': ?personalityProfile,
       'updatedBy': updatedByUid,
       'updatedAt': FieldValue.serverTimestamp(),

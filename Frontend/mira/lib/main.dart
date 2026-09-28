@@ -42,6 +42,16 @@ part 'moment_editor.dart';
 const textScaleKey = 'text_scale_v1';
 final textScaleNotifier = ValueNotifier<double>(1.0);
 
+class _AppTextScaler extends TextScaler {
+  const _AppTextScaler(this.system, this.preference);
+  final TextScaler system;
+  final double preference;
+  @override
+  double scale(double fontSize) => system.scale(fontSize) * preference;
+  @override
+  double get textScaleFactor => scale(14) / 14;
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -179,9 +189,9 @@ class MiraApp extends StatelessWidget {
     builder: (context, child) => ValueListenableBuilder<double>(
       valueListenable: textScaleNotifier,
       builder: (context, scale, _) => MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: TextScaler.linear(scale)),
+        data: MediaQuery.of(context).copyWith(
+          textScaler: _AppTextScaler(MediaQuery.textScalerOf(context), scale),
+        ),
         child: ColoredBox(
           color: const Color(0xFFE9EEE7),
           child: Center(
@@ -314,7 +324,7 @@ class _OnboardingState extends State<Onboarding> {
                 children: [
                   Row(
                     children: [
-                      const Text(
+                      const WordSafeText(
                         'MIRA',
                         style: TextStyle(
                           fontSize: 22,
@@ -326,12 +336,12 @@ class _OnboardingState extends State<Onboarding> {
                       const Spacer(),
                       TextButton(
                         onPressed: widget.onDone,
-                        child: const Text('건너뛰기'),
+                        child: const WordSafeText('건너뛰기'),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  const Text(
+                  const WordSafeText(
                     'Moments In Resonance, Always',
                     style: TextStyle(fontSize: 12, color: violet),
                   ),
@@ -519,7 +529,7 @@ class _AuthScreenState extends State<AuthScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 42),
-            const Text(
+            const WordSafeText(
               'MIRA',
               style: TextStyle(
                 fontSize: 20,
@@ -528,7 +538,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
             const SizedBox(height: 36),
-            Text(
+            WordSafeText(
               signup ? '가족의 첫 페이지를\n만들어 볼까요?' : '다시 만나서\n반가워요',
               style: const TextStyle(
                 fontSize: 34,
@@ -538,7 +548,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Text(
+            WordSafeText(
               signup ? '가족 프로필을 설정하고 둘러보세요.' : '우리 가족의 오늘을 확인해 보세요.',
               style: const TextStyle(color: Colors.black54),
             ),
@@ -596,7 +606,10 @@ class _AuthScreenState extends State<AuthScreen> {
             ],
             if (_errorText != null) ...[
               const SizedBox(height: 12),
-              Text(_errorText!, style: const TextStyle(color: Colors.red)),
+              WordSafeText(
+                _errorText!,
+                style: const TextStyle(color: Colors.red),
+              ),
             ],
             const SizedBox(height: 22),
             SizedBox(
@@ -616,7 +629,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : Text(signup ? '프로필 만들기' : '로그인'),
+                    : WordSafeText(signup ? '프로필 만들기' : '로그인'),
               ),
             ),
             const SizedBox(height: 12),
@@ -632,7 +645,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             ),
                           ),
                         ),
-                  child: const Text('비밀번호를 잊으셨나요?'),
+                  child: const WordSafeText('비밀번호를 잊으셨나요?'),
                 ),
               ),
             Center(
@@ -643,7 +656,9 @@ class _AuthScreenState extends State<AuthScreen> {
                         signup = !signup;
                         _errorText = null;
                       }),
-                child: Text(signup ? '이미 계정이 있어요 · 로그인' : '처음이신가요? · 회원가입'),
+                child: WordSafeText(
+                  signup ? '이미 계정이 있어요 · 로그인' : '처음이신가요? · 회원가입',
+                ),
               ),
             ),
           ],
@@ -671,7 +686,7 @@ class SetupFrame extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            WordSafeText(
               step,
               style: const TextStyle(
                 color: violet,
@@ -689,7 +704,10 @@ class SetupFrame extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            Text(subtitle, style: const TextStyle(color: Colors.black54)),
+            WordSafeText(
+              subtitle,
+              style: const TextStyle(color: Colors.black54),
+            ),
             const SizedBox(height: 32),
             child,
           ],
@@ -803,7 +821,7 @@ class _ProfileSetupState extends State<ProfileSetup> {
               .map(
                 (e) => ChoiceChip(
                   avatar: const Icon(Icons.person_rounded, size: 20),
-                  label: Text(e),
+                  label: WordSafeText(e),
                   selected: role == e,
                   onSelected: (_) => setState(() => role = e),
                 ),
@@ -831,10 +849,13 @@ class _ProfileSetupState extends State<ProfileSetup> {
         ),
         if (_errorText != null) ...[
           const SizedBox(height: 12),
-          Text(_errorText!, style: const TextStyle(color: Colors.red)),
+          WordSafeText(_errorText!, style: const TextStyle(color: Colors.red)),
         ],
         const SizedBox(height: 28),
-        const Text('처음이신가요?', style: TextStyle(fontWeight: FontWeight.w700)),
+        const WordSafeText(
+          '처음이신가요?',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
@@ -847,13 +868,13 @@ class _ProfileSetupState extends State<ProfileSetup> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('가족 코드 생성하기'),
+                : const WordSafeText('가족 코드 생성하기'),
           ),
         ),
         const SizedBox(height: 24),
         const Divider(),
         const SizedBox(height: 16),
-        const Text(
+        const WordSafeText(
           '이미 가족 코드가 있으신가요?',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
@@ -872,14 +893,14 @@ class _ProfileSetupState extends State<ProfileSetup> {
           child: OutlinedButton(
             onPressed: _submitting ? null : _handleJoin,
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(18)),
-            child: const Text('가족 코드 등록하기'),
+            child: const WordSafeText('가족 코드 등록하기'),
           ),
         ),
         const SizedBox(height: 8),
         Center(
           child: TextButton(
             onPressed: widget.onDone,
-            child: const Text('백엔드 연동 없이 화면만 보기'),
+            child: const WordSafeText('백엔드 연동 없이 화면만 보기'),
           ),
         ),
       ],
@@ -897,6 +918,8 @@ class PetSetup extends StatefulWidget {
 class _PetSetupState extends State<PetSetup> {
   bool photo = true;
   String personality = '활발함';
+  String? _petGender;
+  final _petAddressController = TextEditingController();
   PetPersonality? _personalityProfile;
   final _breedController = TextEditingController();
   final _colorController = TextEditingController();
@@ -941,9 +964,14 @@ class _PetSetupState extends State<PetSetup> {
         _hadExistingPet = true;
         photo = false;
         _nameController.text = pet['name'] as String? ?? '';
+        _petAddressController.text =
+            (pet['addresses'] as Map?)?[uid] as String? ?? '';
         _breedController.text = pet['breed'] as String? ?? '';
         _colorController.text = pet['colorDescription'] as String? ?? '';
         personality = pet['personality'] as String? ?? personality;
+        _petGender = ['male', 'female'].contains(pet['gender'])
+            ? pet['gender'] as String
+            : null;
         _personalityProfile = PetPersonality.fromJson(
           pet['personalityProfile'],
         );
@@ -956,6 +984,7 @@ class _PetSetupState extends State<PetSetup> {
     _breedController.dispose();
     _colorController.dispose();
     _nameController.dispose();
+    _petAddressController.dispose();
     super.dispose();
   }
 
@@ -1011,6 +1040,8 @@ class _PetSetupState extends State<PetSetup> {
         colorDescription: _colorController.text.trim(),
         personality: personality,
         personalityProfile: _personalityProfile?.toJson(),
+        gender: _petGender,
+        preferredAddress: _petAddressController.text,
       );
       final image = _characterImage;
       if (image != null) {
@@ -1077,12 +1108,12 @@ class _PetSetupState extends State<PetSetup> {
             segments: const [
               ButtonSegment(
                 value: true,
-                label: Text('사진으로 만들기'),
+                label: WordSafeText('사진으로 만들기'),
                 icon: Icon(CupertinoIcons.sparkles),
               ),
               ButtonSegment(
                 value: false,
-                label: Text('직접 꾸미기'),
+                label: WordSafeText('직접 꾸미기'),
                 icon: Icon(CupertinoIcons.slider_horizontal_3),
               ),
             ],
@@ -1113,11 +1144,11 @@ class _PetSetupState extends State<PetSetup> {
                           color: violet,
                         ),
                         SizedBox(height: 8),
-                        Text(
+                        WordSafeText(
                           '강아지 사진 최대 5장',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
-                        Text(
+                        WordSafeText(
                           '눌러서 사진 선택',
                           style: TextStyle(color: Colors.black45, fontSize: 12),
                         ),
@@ -1173,23 +1204,26 @@ class _PetSetupState extends State<PetSetup> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(CupertinoIcons.sparkles),
-                label: Text(_analyzing ? '분석 중...' : 'AI로 분석하기'),
+                label: WordSafeText(_analyzing ? '분석 중...' : 'AI로 분석하기'),
               ),
             ),
           ],
           if (_analysisError != null) ...[
             const SizedBox(height: 8),
-            Text(
+            WordSafeText(
               _analysisError!,
               style: const TextStyle(color: Colors.red, fontSize: 12),
             ),
           ],
           if (_breedController.text.isNotEmpty) ...[
             const SizedBox(height: 14),
-            const Text('분석 결과', style: TextStyle(fontWeight: FontWeight.w700)),
+            const WordSafeText(
+              '분석 결과',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 6),
-            Text('품종: ${_breedController.text}'),
-            Text('색상: ${_colorController.text}'),
+            WordSafeText('품종: ${_breedController.text}'),
+            WordSafeText('색상: ${_colorController.text}'),
           ],
         ] else
           Column(
@@ -1206,9 +1240,48 @@ class _PetSetupState extends State<PetSetup> {
             ],
           ),
         const SizedBox(height: 22),
-        const Text('우리 아이 성격', style: TextStyle(fontWeight: FontWeight.w600)),
+        const WordSafeText(
+          '우리 아이 성별',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 8),
-        const Text(
+        Wrap(
+          spacing: 8,
+          children: [
+            ChoiceChip(
+              label: const WordSafeText('남아'),
+              selected: _petGender == 'male',
+              onSelected: _saving
+                  ? null
+                  : (_) => setState(() => _petGender = 'male'),
+            ),
+            ChoiceChip(
+              label: const WordSafeText('여아'),
+              selected: _petGender == 'female',
+              onSelected: _saving
+                  ? null
+                  : (_) => setState(() => _petGender = 'female'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 22),
+        TextField(
+          key: const ValueKey('pet-preferred-address'),
+          controller: _petAddressController,
+          enabled: !_loadingExisting && !_saving,
+          maxLength: 20,
+          decoration: const InputDecoration(
+            labelText: '반려견에게 듣고 싶은 호칭',
+            counterText: '',
+          ),
+        ),
+        const SizedBox(height: 22),
+        const WordSafeText(
+          '우리 아이 성격',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        const WordSafeText(
           '짧은 네 가지 질문으로 평소 모습을 알려주세요. 대화 말투에 반영돼요.',
           style: TextStyle(fontSize: 12, color: Colors.black54),
         ),
@@ -1218,14 +1291,14 @@ class _PetSetupState extends State<PetSetup> {
             spacing: 8,
             runSpacing: 4,
             children: _personalityProfile!.labels
-                .map((label) => Chip(label: Text(label)))
+                .map((label) => Chip(label: WordSafeText(label)))
                 .toList(),
           ),
         ],
         const SizedBox(height: 10),
         OutlinedButton.icon(
           icon: const Icon(CupertinoIcons.paw),
-          label: Text(
+          label: WordSafeText(
             _personalityProfile == null ? '성격 테스트 시작 · 4문항' : '성격 테스트 다시 하기',
           ),
           onPressed: _saving
@@ -1248,9 +1321,12 @@ class _PetSetupState extends State<PetSetup> {
                 },
         ),
         const SizedBox(height: 22),
-        const Text('AI 캐릭터', style: TextStyle(fontWeight: FontWeight.w600)),
+        const WordSafeText(
+          'AI 캐릭터',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 4),
-        const Text(
+        const WordSafeText(
           '견종·색상·성격으로 우리 아이만의 마스코트를 만들어요.',
           style: TextStyle(color: Colors.black45, fontSize: 12),
         ),
@@ -1266,7 +1342,7 @@ class _PetSetupState extends State<PetSetup> {
           ),
         if (_characterError != null) ...[
           const SizedBox(height: 8),
-          Text(
+          WordSafeText(
             _characterError!,
             style: const TextStyle(color: Colors.red, fontSize: 12),
           ),
@@ -1285,7 +1361,7 @@ class _PetSetupState extends State<PetSetup> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(CupertinoIcons.wand_stars),
-            label: Text(
+            label: WordSafeText(
               _generatingCharacter
                   ? '만드는 중...'
                   : _characterImage == null
@@ -1301,7 +1377,7 @@ class _PetSetupState extends State<PetSetup> {
         ),
         if (_saveError != null) ...[
           const SizedBox(height: 12),
-          Text(_saveError!, style: const TextStyle(color: Colors.red)),
+          WordSafeText(_saveError!, style: const TextStyle(color: Colors.red)),
         ],
         const SizedBox(height: 26),
         SizedBox(
@@ -1315,7 +1391,7 @@ class _PetSetupState extends State<PetSetup> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Text(_hadExistingPet ? '저장하기' : 'MIRA 시작하기'),
+                : WordSafeText(_hadExistingPet ? '저장하기' : 'MIRA 시작하기'),
           ),
         ),
       ],
@@ -1353,18 +1429,18 @@ class _MainShellState extends State<MainShell> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('기기에 저장한 데이터를 삭제할까요?'),
-        content: const Text(
+        title: const WordSafeText('기기에 저장한 데이터를 삭제할까요?'),
+        content: const WordSafeText(
           '이 기기의 강아지 성장·캐릭터 이미지·글자 크기·안내 확인 기록을 초기화해요. 가족에게 공유한 글과 사진, 계정은 유지돼요.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: const WordSafeText('취소'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('삭제'),
+            child: const WordSafeText('삭제'),
           ),
         ],
       ),
@@ -1387,7 +1463,7 @@ class _MainShellState extends State<MainShell> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('삭제를 완료하지 못했어요. 다시 시도해 주세요.')),
+          const SnackBar(content: WordSafeText('삭제를 완료하지 못했어요. 다시 시도해 주세요.')),
         );
       }
     }
@@ -1447,12 +1523,12 @@ class _MainShellState extends State<MainShell> {
   void _attendance() => showDialog(
     context: context,
     builder: (c) => AlertDialog(
-      title: const Text('오늘의 돌봄 현황'),
+      title: const WordSafeText('오늘의 돌봄 현황'),
       content: const SizedBox(width: 320, child: _FamilyCareSection()),
       actions: [
         FilledButton(
           onPressed: () => Navigator.pop(c),
-          child: const Text('닫기'),
+          child: const WordSafeText('닫기'),
         ),
       ],
     ),
@@ -1466,7 +1542,10 @@ class _FamilyCareSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final myUid = currentUidOrNull();
     if (myUid == null) {
-      return const Text('로그인이 필요해요.', style: TextStyle(color: Colors.black54));
+      return const WordSafeText(
+        '로그인이 필요해요.',
+        style: TextStyle(color: Colors.black54),
+      );
     }
     return FutureBuilder<String?>(
       future: FamilyService.instance.fetchMyFamilyId(myUid),
@@ -1479,7 +1558,7 @@ class _FamilyCareSection extends StatelessWidget {
           );
         }
         if (familyId == null) {
-          return const Text(
+          return const WordSafeText(
             '아직 가족에 소속되어 있지 않아요.',
             style: TextStyle(color: Colors.black54),
           );
@@ -1492,11 +1571,13 @@ class _FamilyCareSection extends StatelessWidget {
               stream: DailyCareService.instance.watchToday(familyId),
               builder: (context, careSnapshot) {
                 if (careSnapshot.hasError) {
-                  return const Text('돌봄 배정을 불러오지 못했어요. 잠시 후 다시 확인해주세요.');
+                  return const WordSafeText(
+                    '돌봄 배정을 불러오지 못했어요. 잠시 후 다시 확인해주세요.',
+                  );
                 }
                 final care = careSnapshot.data ?? const {};
                 if (members.isEmpty) {
-                  return const Text(
+                  return const WordSafeText(
                     '가족 구성원이 없어요.',
                     style: TextStyle(color: Colors.black54),
                   );
@@ -1512,7 +1593,7 @@ class _FamilyCareSection extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
                         child: Row(
                           children: [
-                            const Text(
+                            const WordSafeText(
                               '오늘 현황',
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
@@ -1521,7 +1602,7 @@ class _FamilyCareSection extends StatelessWidget {
                               ),
                             ),
                             const Spacer(),
-                            Text(
+                            WordSafeText(
                               '$doneCount / ${members.length} 완료',
                               style: const TextStyle(
                                 fontSize: 12,
@@ -1555,7 +1636,7 @@ class _FamilyCareSection extends StatelessWidget {
                                 child: Row(
                                   children: [
                                     Expanded(
-                                      child: Text(
+                                      child: WordSafeText(
                                         record != null
                                             ? '$avatar $name · ${record['action']} 하면 완료돼요'
                                             : '$avatar $name',
@@ -1565,7 +1646,7 @@ class _FamilyCareSection extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                    const Text(
+                                    const WordSafeText(
                                       '자동 배정',
                                       style: TextStyle(color: Colors.black54),
                                     ),
@@ -1613,7 +1694,7 @@ class AppPage extends StatelessWidget {
         floating: true,
         backgroundColor: cream,
         surfaceTintColor: Colors.transparent,
-        title: Text(
+        title: WordSafeText(
           title,
           style: const TextStyle(
             fontWeight: FontWeight.w700,
@@ -1672,14 +1753,16 @@ class _MoodAlertListenerState extends State<_MoodAlertListener> {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (c) => AlertDialog(
-                title: Text(first.data()['title'] as String? ?? '가족 소식'),
+                title: WordSafeText(
+                  first.data()['title'] as String? ?? '가족 소식',
+                ),
                 content: SingleChildScrollView(
                   child: WordWrapText(first.data()['message'] as String? ?? ''),
                 ),
                 actions: [
                   FilledButton(
                     onPressed: () => Navigator.pop(c, true),
-                    child: const Text('확인'),
+                    child: const WordSafeText('확인'),
                   ),
                 ],
               ),
@@ -1744,7 +1827,7 @@ class HomePage extends StatelessWidget {
             size: 16,
             color: violet,
           ),
-          label: const Text('우리 가족의 하루'),
+          label: const WordSafeText('우리 가족의 하루'),
           side: BorderSide.none,
           backgroundColor: const Color(0xFFE7EDE2),
         ),
@@ -1753,7 +1836,7 @@ class HomePage extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        WordSafeText(
           '${DateTime.now().month}월 ${DateTime.now().day}일 · 오늘도 함께',
           style: TextStyle(
             fontSize: 11,
@@ -1777,7 +1860,7 @@ class HomePage extends StatelessWidget {
             const _CharacterAvatar(),
             const SizedBox(width: 8),
             const Expanded(
-              child: Text(
+              child: WordSafeText(
                 '우리 집 작은 친구',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
@@ -1788,7 +1871,7 @@ class HomePage extends StatelessWidget {
                 CupertinoIcons.arrow_up_left_arrow_down_right,
                 size: 16,
               ),
-              label: const Text('크게 보기'),
+              label: const WordSafeText('크게 보기'),
             ),
           ],
         ),
@@ -1808,7 +1891,7 @@ class HomePage extends StatelessWidget {
           child: FilledButton.icon(
             onPressed: onAttendance,
             icon: const Icon(CupertinoIcons.sun_max),
-            label: const Text(
+            label: const WordSafeText(
               '오늘의 돌봄 확인  →',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
@@ -1971,7 +2054,7 @@ class _FamilyPageState extends State<FamilyPage> {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('가족에 먼저 참여해주세요.')));
+        ).showSnackBar(const SnackBar(content: WordSafeText('가족에 먼저 참여해주세요.')));
       }
       return;
     }
@@ -2000,7 +2083,7 @@ class _FamilyPageState extends State<FamilyPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            const WordSafeText(
               '가족에게 이야기 남기기',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
             ),
@@ -2034,7 +2117,7 @@ class _FamilyPageState extends State<FamilyPage> {
                   );
                   if (c.mounted) Navigator.pop(c);
                 },
-                child: const Text('기록하기'),
+                child: const WordSafeText('기록하기'),
               ),
             ),
           ],
@@ -2072,7 +2155,7 @@ Future<void> _showCommentsSheet({
             children: [
               const Padding(
                 padding: EdgeInsets.only(bottom: 8),
-                child: Text(
+                child: WordSafeText(
                   '댓글',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
                 ),
@@ -2091,7 +2174,7 @@ Future<void> _showCommentsSheet({
                         final docs = snapshot.data ?? const [];
                         if (docs.isEmpty) {
                           return const Center(
-                            child: Text(
+                            child: WordSafeText(
                               '아직 댓글이 없어요.',
                               style: TextStyle(color: Colors.black54),
                             ),
@@ -2117,7 +2200,7 @@ Future<void> _showCommentsSheet({
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
+                                          WordSafeText(
                                             doc.data()['authorName']
                                                     as String? ??
                                                 '이름 없음',
@@ -2193,7 +2276,9 @@ Future<void> _showCommentsSheet({
                             if (sheetOpen && sheetContext.mounted) {
                               ScaffoldMessenger.of(sheetContext).showSnackBar(
                                 const SnackBar(
-                                  content: Text('댓글을 저장하지 못했어요. 다시 시도해주세요.'),
+                                  content: WordSafeText(
+                                    '댓글을 저장하지 못했어요. 다시 시도해주세요.',
+                                  ),
                                 ),
                               );
                             }
@@ -2235,7 +2320,7 @@ class _MomentsSectionState extends State<_MomentsSection> {
   Widget build(BuildContext context) {
     final uid = currentUidOrNull();
     if (uid == null) {
-      return const Text(
+      return const WordSafeText(
         '로그인 후 가족 이야기를 볼 수 있어요.',
         style: TextStyle(color: Colors.black54),
       );
@@ -2254,7 +2339,7 @@ class _MomentsSectionState extends State<_MomentsSection> {
           );
         }
         if (familyId == null) {
-          return const Text(
+          return const WordSafeText(
             '아직 가족에 소속되어 있지 않아요.',
             style: TextStyle(color: Colors.black54),
           );
@@ -2268,7 +2353,7 @@ class _MomentsSectionState extends State<_MomentsSection> {
             if (!snapshot.hasData) return const LinearProgressIndicator();
             final docs = snapshot.data ?? const [];
             if (docs.isEmpty) {
-              return const Text(
+              return const WordSafeText(
                 '아직 기록된 가족 이야기가 없어요.',
                 style: TextStyle(color: Colors.black54),
               );
@@ -2286,7 +2371,7 @@ class _MomentsSectionState extends State<_MomentsSection> {
                 ))
                   const Padding(
                     padding: EdgeInsets.all(16),
-                    child: Text('조건에 맞는 이야기가 없어요.'),
+                    child: WordSafeText('조건에 맞는 이야기가 없어요.'),
                   ),
                 for (final doc in docs.where(
                   (d) => matchesStory(d.data(), _query, _filter, uid),
@@ -2363,7 +2448,7 @@ class _FamilyMembersSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = currentUidOrNull();
     if (uid == null) {
-      return const Text(
+      return const WordSafeText(
         '로그인 후 가족 구성원을 볼 수 있어요.',
         style: TextStyle(color: Colors.black54),
       );
@@ -2379,7 +2464,7 @@ class _FamilyMembersSection extends StatelessWidget {
           );
         }
         if (familyId == null) {
-          return const Text(
+          return const WordSafeText(
             '아직 가족에 소속되어 있지 않아요.',
             style: TextStyle(color: Colors.black54),
           );
@@ -2389,7 +2474,7 @@ class _FamilyMembersSection extends StatelessWidget {
           builder: (context, snapshot) {
             final members = snapshot.data ?? const [];
             if (members.isEmpty) {
-              return const Text(
+              return const WordSafeText(
                 '아직 참여한 가족 구성원이 없어요.',
                 style: TextStyle(color: Colors.black54),
               );
@@ -2405,7 +2490,7 @@ class _FamilyMembersSection extends StatelessWidget {
                       role: member['role'] as String?,
                       radius: 12,
                     ),
-                    label: Text(
+                    label: WordSafeText(
                       '${member['name'] ?? '이름 없음'} · ${member['role'] ?? '역할 미설정'}',
                     ),
                   ),
@@ -2481,12 +2566,12 @@ class DiaryCard extends StatelessWidget {
                   size: 19,
                   color: isLiked ? Colors.redAccent : null,
                 ),
-                label: Text('$likes'),
+                label: WordSafeText('$likes'),
               ),
               TextButton.icon(
                 onPressed: onComment,
                 icon: const Icon(CupertinoIcons.chat_bubble, size: 18),
-                label: Text('$comments'),
+                label: WordSafeText('$comments'),
               ),
               const Spacer(),
               if (onEdit != null || onDelete != null)
@@ -2502,9 +2587,15 @@ class DiaryCard extends StatelessWidget {
                   },
                   itemBuilder: (_) => [
                     if (onEdit != null)
-                      const PopupMenuItem(value: 'edit', child: Text('수정')),
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: WordSafeText('수정'),
+                      ),
                     if (onDelete != null)
-                      const PopupMenuItem(value: 'delete', child: Text('삭제')),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: WordSafeText('삭제'),
+                      ),
                   ],
                 ),
             ],
@@ -2572,20 +2663,20 @@ class SettingsPage extends StatelessWidget {
               ),
               ListTile(
                 leading: const Icon(CupertinoIcons.lock_shield),
-                title: const Text('개인정보 처리방침'),
-                subtitle: const Text('저장하는 정보 · 사진 접근 · 삭제'),
+                title: const WordSafeText('개인정보 처리방침'),
+                subtitle: const WordSafeText('저장하는 정보 · 사진 접근 · 삭제'),
                 trailing: const Icon(CupertinoIcons.chevron_right, size: 18),
                 onTap: () => showPrivacyDocument(context),
               ),
               ListTile(
                 leading: const Icon(CupertinoIcons.doc_text),
-                title: const Text('이용 안내'),
+                title: const WordSafeText('이용 안내'),
                 trailing: const Icon(CupertinoIcons.chevron_right, size: 18),
                 onTap: () => showPrivacyDocument(context, terms: true),
               ),
               ListTile(
                 leading: const Icon(CupertinoIcons.trash),
-                title: const Text('기기에 저장한 데이터 삭제'),
+                title: const WordSafeText('기기에 저장한 데이터 삭제'),
                 subtitle: const WordWrapText('기기 설정 초기화 · 가족 공유 기록은 유지'),
                 onTap: onClearData,
               ),
@@ -2635,7 +2726,10 @@ class SettingsPage extends StatelessWidget {
               CupertinoIcons.square_arrow_right,
               color: Colors.red,
             ),
-            title: const Text('로그아웃', style: TextStyle(color: Colors.red)),
+            title: const WordSafeText(
+              '로그아웃',
+              style: TextStyle(color: Colors.red),
+            ),
             onTap: () async {
               await AuthService.instance.signOut();
               if (context.mounted) {
@@ -2659,8 +2753,11 @@ class SettingsPage extends StatelessWidget {
     VoidCallback? onTap,
   }) => ListTile(
     leading: Icon(icon),
-    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-    subtitle: Text(sub),
+    title: WordSafeText(
+      title,
+      style: const TextStyle(fontWeight: FontWeight.w700),
+    ),
+    subtitle: WordSafeText(sub),
     trailing: const Icon(CupertinoIcons.chevron_right),
     onTap: onTap,
   );
@@ -2699,9 +2796,9 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     return Scaffold(
-      appBar: AppBar(title: const Text('가족 관리')),
+      appBar: AppBar(title: const WordSafeText('가족 관리')),
       body: uid == null
-          ? const Center(child: Text('로그인이 필요해요.'))
+          ? const Center(child: WordSafeText('로그인이 필요해요.'))
           : _loading
           ? const Center(child: CircularProgressIndicator())
           : _familyId == null
@@ -2721,11 +2818,14 @@ class _FamilyDetails extends StatelessWidget {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(20),
     children: [
-      const Text('초대 코드', style: TextStyle(fontWeight: FontWeight.w700)),
+      const WordSafeText(
+        '초대 코드',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
       const SizedBox(height: 8),
       Card(
         child: ListTile(
-          title: Text(
+          title: WordSafeText(
             familyId,
             style: const TextStyle(
               fontSize: 22,
@@ -2733,20 +2833,23 @@ class _FamilyDetails extends StatelessWidget {
               letterSpacing: 2,
             ),
           ),
-          subtitle: const Text('가족에게 이 코드를 공유해주세요'),
+          subtitle: const WordSafeText('가족에게 이 코드를 공유해주세요'),
           trailing: IconButton(
             icon: const Icon(CupertinoIcons.doc_on_doc),
             onPressed: () {
               Clipboard.setData(ClipboardData(text: familyId));
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('초대 코드를 복사했어요.')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: WordSafeText('초대 코드를 복사했어요.')),
+              );
             },
           ),
         ),
       ),
       const SizedBox(height: 24),
-      const Text('가족 구성원', style: TextStyle(fontWeight: FontWeight.w700)),
+      const WordSafeText(
+        '가족 구성원',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
       const SizedBox(height: 8),
       StreamBuilder<List<Map<String, dynamic>>>(
         stream: FamilyService.instance.watchFamilyMembers(familyId),
@@ -2755,7 +2858,7 @@ class _FamilyDetails extends StatelessWidget {
           if (members.isEmpty) {
             return const Padding(
               padding: EdgeInsets.all(12),
-              child: Text('구성원이 없어요.'),
+              child: WordSafeText('구성원이 없어요.'),
             );
           }
           return Card(
@@ -2767,8 +2870,8 @@ class _FamilyDetails extends StatelessWidget {
                       uid: member['uid'] as String?,
                       role: member['role'] as String?,
                     ),
-                    title: Text(member['name'] as String? ?? '이름 없음'),
-                    subtitle: Text(member['role'] as String? ?? ''),
+                    title: WordSafeText(member['name'] as String? ?? '이름 없음'),
+                    subtitle: WordSafeText(member['role'] as String? ?? ''),
                   ),
               ],
             ),
@@ -2838,17 +2941,17 @@ class _JoinOrCreateFamilyFormState extends State<_JoinOrCreateFamilyForm> {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(20),
     children: [
-      const Text(
+      const WordSafeText(
         '아직 가족에 소속되어 있지 않아요',
         style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
       ),
       const SizedBox(height: 6),
-      const Text(
+      const WordSafeText(
         '가족을 새로 만들거나, 초대 코드로 참여해보세요.',
         style: TextStyle(color: Colors.black54),
       ),
       const SizedBox(height: 20),
-      const Text('내 역할', style: TextStyle(fontWeight: FontWeight.w700)),
+      const WordSafeText('내 역할', style: TextStyle(fontWeight: FontWeight.w700)),
       const SizedBox(height: 10),
       Wrap(
         spacing: 8,
@@ -2856,7 +2959,7 @@ class _JoinOrCreateFamilyFormState extends State<_JoinOrCreateFamilyForm> {
             .map(
               (e) => ChoiceChip(
                 avatar: const Icon(Icons.person_rounded, size: 20),
-                label: Text(e),
+                label: WordSafeText(e),
                 selected: role == e,
                 onSelected: (_) => setState(() => role = e),
               ),
@@ -2865,10 +2968,13 @@ class _JoinOrCreateFamilyFormState extends State<_JoinOrCreateFamilyForm> {
       ),
       if (_errorText != null) ...[
         const SizedBox(height: 12),
-        Text(_errorText!, style: const TextStyle(color: Colors.red)),
+        WordSafeText(_errorText!, style: const TextStyle(color: Colors.red)),
       ],
       const SizedBox(height: 24),
-      const Text('처음이신가요?', style: TextStyle(fontWeight: FontWeight.w700)),
+      const WordSafeText(
+        '처음이신가요?',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
       const SizedBox(height: 10),
       SizedBox(
         width: double.infinity,
@@ -2880,13 +2986,13 @@ class _JoinOrCreateFamilyFormState extends State<_JoinOrCreateFamilyForm> {
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('가족 코드 생성하기'),
+              : const WordSafeText('가족 코드 생성하기'),
         ),
       ),
       const SizedBox(height: 24),
       const Divider(),
       const SizedBox(height: 16),
-      const Text(
+      const WordSafeText(
         '이미 가족 코드가 있으신가요?',
         style: TextStyle(fontWeight: FontWeight.w700),
       ),
@@ -2904,7 +3010,7 @@ class _JoinOrCreateFamilyFormState extends State<_JoinOrCreateFamilyForm> {
         width: double.infinity,
         child: OutlinedButton(
           onPressed: _submitting ? null : _handleJoin,
-          child: const Text('가족 코드 등록하기'),
+          child: const WordSafeText('가족 코드 등록하기'),
         ),
       ),
     ],
@@ -2976,7 +3082,7 @@ class _NotificationSettingsScreenState
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('설정을 저장하지 못했어요. 다시 시도해주세요.')),
+          const SnackBar(content: WordSafeText('설정을 저장하지 못했어요. 다시 시도해주세요.')),
         );
       }
     } finally {
@@ -2986,7 +3092,7 @@ class _NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('알림')),
+    appBar: AppBar(title: const WordSafeText('알림')),
     body: _loading
         ? const Center(child: CircularProgressIndicator())
         : ListView(
@@ -3002,11 +3108,11 @@ class _NotificationSettingsScreenState
                       });
                       _load();
                     },
-                    child: const Text('재시도'),
+                    child: const WordSafeText('재시도'),
                   ),
                 ),
               SwitchListTile(
-                title: const Text('돌봄 알림'),
+                title: const WordSafeText('돌봄 알림'),
                 subtitle: const WordWrapText(
                   '내게 오늘의 돌봄이 배정되거나, 가족이 돌봄을 완료하면 알려드려요',
                 ),
@@ -3017,7 +3123,7 @@ class _NotificationSettingsScreenState
                     : (v) => _save('careEnabled', v),
               ),
               SwitchListTile(
-                title: const Text('댓글 알림'),
+                title: const WordSafeText('댓글 알림'),
                 subtitle: const WordWrapText('가족이 내 기록에 댓글을 남기면 알려드려요'),
                 value: _comment,
                 onChanged:
@@ -3026,8 +3132,8 @@ class _NotificationSettingsScreenState
                     : (v) => _save('commentEnabled', v),
               ),
               SwitchListTile(
-                title: const Text('일정 알림'),
-                subtitle: const Text('다가오는 가족 일정을 알려드려요'),
+                title: const WordSafeText('일정 알림'),
+                subtitle: const WordSafeText('다가오는 가족 일정을 알려드려요'),
                 value: _schedule,
                 onChanged:
                     _saving || _error != null || currentUidOrNull() == null
@@ -3044,13 +3150,16 @@ class DisplaySettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('화면 설정')),
+    appBar: AppBar(title: const WordSafeText('화면 설정')),
     body: Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('글자 크기', style: TextStyle(fontWeight: FontWeight.w700)),
+          const WordSafeText(
+            '글자 크기',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 12),
           ValueListenableBuilder<double>(
             valueListenable: textScaleNotifier,
@@ -3069,7 +3178,7 @@ class DisplaySettingsScreen extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 8),
-                const Text('가족과 함께 볼 땐 이 정도가 딱 좋아요.'),
+                const WordSafeText('가족과 함께 볼 땐 이 정도가 딱 좋아요.'),
               ],
             ),
           ),
@@ -3094,12 +3203,12 @@ class HelpScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('도움말')),
+    appBar: AppBar(title: const WordSafeText('도움말')),
     body: ListView(
       children: [
         for (final item in _faq)
           ExpansionTile(
-            title: Text(
+            title: WordSafeText(
               item.$1,
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
@@ -3108,7 +3217,7 @@ class HelpScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
+                  child: WordSafeText(
                     item.$2,
                     style: const TextStyle(color: Colors.black54),
                   ),
@@ -3128,8 +3237,8 @@ class _ProfileCard extends StatelessWidget {
     if (uid == null) {
       return const Card(
         child: ListTile(
-          leading: CircleAvatar(child: Text('👤')),
-          title: Text('로그인 정보 없음'),
+          leading: CircleAvatar(child: WordSafeText('👤')),
+          title: WordSafeText('로그인 정보 없음'),
         ),
       );
     }
@@ -3145,11 +3254,11 @@ class _ProfileCard extends StatelessWidget {
         return Card(
           child: ListTile(
             leading: AuthorAvatar(uid: uid, role: role),
-            title: Text(
+            title: WordSafeText(
               name,
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
-            subtitle: Text(role != null ? '우리 가족 · $role' : '역할 미설정'),
+            subtitle: WordSafeText(role != null ? '우리 가족 · $role' : '역할 미설정'),
             trailing: const Icon(CupertinoIcons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
@@ -3311,7 +3420,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('프로필 수정')),
+    appBar: AppBar(title: const WordSafeText('프로필 수정')),
     body: _loading
         ? const Center(child: CircularProgressIndicator())
         : ListView(
@@ -3343,13 +3452,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       children: [
                         TextButton(
                           onPressed: _pickingPhoto ? null : _pickPhoto,
-                          child: const Text('사진 바꾸기'),
+                          child: const WordSafeText('사진 바꾸기'),
                         ),
                         if (_newPhotoBytes != null ||
                             _existingPhotoBase64 != null)
                           TextButton(
                             onPressed: _clearPhoto,
-                            child: const Text('사진 제거'),
+                            child: const WordSafeText('사진 제거'),
                           ),
                       ],
                     ),
@@ -3389,7 +3498,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
+                WordSafeText(
+                  _error!,
+                  style: const TextStyle(color: Colors.red),
+                ),
               ],
               const SizedBox(height: 24),
               SizedBox(
@@ -3405,7 +3517,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('저장하기'),
+                      : const WordSafeText('저장하기'),
                 ),
               ),
             ],
@@ -3447,7 +3559,7 @@ class QuestCard extends StatelessWidget {
               color: Colors.white.withValues(alpha: .7),
               borderRadius: BorderRadius.circular(17),
             ),
-            child: Text(icon, style: const TextStyle(fontSize: 25)),
+            child: WordSafeText(icon, style: const TextStyle(fontSize: 25)),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -3515,7 +3627,7 @@ class DailyQuest extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(icon, style: const TextStyle(fontSize: 21)),
+          WordSafeText(icon, style: const TextStyle(fontSize: 21)),
           const SizedBox(width: 12),
           Expanded(
             child: WordWrapText(
@@ -3557,7 +3669,7 @@ class CareLine extends StatelessWidget {
     child: Row(
       children: [
         Expanded(
-          child: Text(
+          child: WordSafeText(
             who,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.w700),
@@ -3587,12 +3699,12 @@ class Metric extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          WordSafeText(
             '$icon  $label',
             style: const TextStyle(fontSize: 11, color: Colors.black54),
           ),
           const SizedBox(height: 8),
-          Text(
+          WordSafeText(
             value,
             style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w700),
           ),
@@ -3662,7 +3774,7 @@ class Insight extends StatelessWidget {
       const SizedBox(width: 16),
       SizedBox(
         width: 64,
-        child: Text(
+        child: WordSafeText(
           value,
           textAlign: TextAlign.right,
           style: const TextStyle(color: violet, fontWeight: FontWeight.w700),

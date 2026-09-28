@@ -123,6 +123,15 @@ class DogController extends ChangeNotifier {
     await _save();
   }
 
+  Future<void> customize({String? accessory, String? roomTheme}) async {
+    if (_disposed || _isLoading) return;
+    if (accessory != null && !_state.canWear(accessory)) return;
+    if (roomTheme != null && !_state.canUseTheme(roomTheme)) return;
+    _state = _state.copyWith(accessory: accessory, roomTheme: roomTheme);
+    notifyListeners();
+    await _save();
+  }
+
   @visibleForTesting
   static DogState applyOfflineDecay(DogState state, DateTime now) {
     final intervals = now.difference(state.lastUpdated).inMinutes ~/ 10;

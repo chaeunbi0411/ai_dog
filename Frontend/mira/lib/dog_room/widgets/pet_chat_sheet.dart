@@ -90,7 +90,7 @@ class _PetChatSheetState extends State<PetChatSheet> {
             Row(
               children: [
                 const Expanded(
-                  child: Text(
+                  child: WordSafeText(
                     '강아지와 이야기',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
@@ -102,7 +102,7 @@ class _PetChatSheetState extends State<PetChatSheet> {
                 ),
               ],
             ),
-            const Text('오늘의 돌봄 이야기를 해보자!'),
+            const WordSafeText('오늘의 돌봄 이야기를 해보자!'),
             Expanded(
               child: ListView.builder(
                 controller: _scroll,
@@ -134,7 +134,7 @@ class _PetChatSheetState extends State<PetChatSheet> {
                 child: WordWrapText('강아지가 답변을 생각하고 있어요. 잠시만 기다려주세요.'),
               ),
             if (_error != null)
-              Text(
+              WordSafeText(
                 _error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),

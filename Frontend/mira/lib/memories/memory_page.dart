@@ -44,14 +44,14 @@ class _MemoryPageState extends State<MemoryPage> {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('우리 가족 사진첩'),
-        content: const Text(
+        title: const WordSafeText('우리 가족 사진첩'),
+        content: const WordSafeText(
           '가족과 함께한 소중한 순간을 사진으로 남겨 보세요.\n오른쪽 위 + 버튼을 누르면 사진과 이야기를 올릴 수 있어요.',
         ),
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('확인'),
+            child: const WordSafeText('확인'),
           ),
         ],
       ),
@@ -105,7 +105,7 @@ class _MemoryPageState extends State<MemoryPage> {
     }
     final uid = maybeUid;
     if (uid == null) {
-      return const Center(child: Text('로그인 후 사진첩을 볼 수 있어요.'));
+      return const Center(child: WordSafeText('로그인 후 사진첩을 볼 수 있어요.'));
     }
     return FutureBuilder<String?>(
       future: FamilyService.instance.fetchMyFamilyId(uid),
@@ -115,7 +115,7 @@ class _MemoryPageState extends State<MemoryPage> {
           return const Center(child: CircularProgressIndicator());
         }
         if (familyId == null) {
-          return const Center(child: Text('아직 가족에 소속되어 있지 않아요.'));
+          return const Center(child: WordSafeText('아직 가족에 소속되어 있지 않아요.'));
         }
         if (widget.active) {
           WidgetsBinding.instance.addPostFrameCallback(
@@ -130,7 +130,7 @@ class _MemoryPageState extends State<MemoryPage> {
             return CustomScrollView(
               slivers: [
                 SliverAppBar(
-                  title: const Text('우리의 사진첩'),
+                  title: const WordSafeText('우리의 사진첩'),
                   actions: [
                     IconButton(
                       tooltip: '사진과 글 올리기',
@@ -145,7 +145,7 @@ class _MemoryPageState extends State<MemoryPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        const WordSafeText(
                           '평범한 하루도,\n우리에게는 소중한 장면.',
                           style: TextStyle(
                             fontSize: 27,
@@ -155,7 +155,7 @@ class _MemoryPageState extends State<MemoryPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
+                        const WordSafeText(
                           '사진을 누르고 이야기와 마음을 남겨 보세요.',
                           style: TextStyle(
                             color: Color(0xFF68766D),
@@ -171,14 +171,14 @@ class _MemoryPageState extends State<MemoryPage> {
                               color: _green,
                             ),
                             const SizedBox(width: 8),
-                            Text(
+                            WordSafeText(
                               '${docs.length}장의 순간',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             const Spacer(),
-                            const Text(
+                            const WordSafeText(
                               '우리 가족과 공유',
                               style: TextStyle(
                                 fontSize: 12,
@@ -207,11 +207,11 @@ class _MemoryPageState extends State<MemoryPage> {
                             color: _green,
                           ),
                           const SizedBox(height: 16),
-                          const Text('첫 번째 추억을 남겨 볼까요?'),
+                          const WordSafeText('첫 번째 추억을 남겨 볼까요?'),
                           const SizedBox(height: 16),
                           FilledButton(
                             onPressed: () => _compose(familyId, uid),
-                            child: const Text('사진 올리기'),
+                            child: const WordSafeText('사진 올리기'),
                           ),
                         ],
                       ),
@@ -302,7 +302,7 @@ class _MemoryPageState extends State<MemoryPage> {
                                                       color: Colors.white,
                                                       size: 11,
                                                     ),
-                                                    Text(
+                                                    WordSafeText(
                                                       ' $commentCount',
                                                       style: const TextStyle(
                                                         color: Colors.white,
@@ -346,7 +346,7 @@ class _RoleTag extends StatelessWidget {
     ),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-      child: Text(
+      child: WordSafeText(
         role,
         style: const TextStyle(
           color: Colors.white,
@@ -454,16 +454,16 @@ class _ComposePageState extends State<_ComposePage> {
   Widget build(BuildContext context) => PopScope(
     canPop: !publishing,
     child: Scaffold(
-      appBar: AppBar(title: const Text('오늘의 순간 남기기')),
+      appBar: AppBar(title: const WordSafeText('오늘의 순간 남기기')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text(
+          const WordSafeText(
             '어떤 하루였나요?',
             style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
-          const Text(
+          const WordSafeText(
             '사진과 짧은 글을 함께 담아 주세요.\n올린 사진은 우리 가족 모두가 볼 수 있어요.',
             style: TextStyle(height: 1.6, color: Color(0xFF68766D)),
           ),
@@ -505,12 +505,14 @@ class _ComposePageState extends State<_ComposePage> {
                 ? null
                 : _pick,
             icon: const Icon(CupertinoIcons.photo_on_rectangle),
-            label: Text(picking ? '사진을 불러오는 중…' : '사진 선택 (${photos.length}/8)'),
+            label: WordSafeText(
+              picking ? '사진을 불러오는 중…' : '사진 선택 (${photos.length}/8)',
+            ),
           ),
           if (error != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(
+              child: WordSafeText(
                 error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
@@ -555,7 +557,7 @@ class _ComposePageState extends State<_ComposePage> {
                       }
                     }
                   },
-            child: Text(publishing ? '저장하는 중…' : '사진첩에 저장'),
+            child: WordSafeText(publishing ? '저장하는 중…' : '사진첩에 저장'),
           ),
         ],
       ),
@@ -575,16 +577,16 @@ class _PhotoDetailPage extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('이 사진을 삭제할까요?'),
-        content: const Text('사진과 글, 댓글이 함께 삭제돼요.'),
+        title: const WordSafeText('이 사진을 삭제할까요?'),
+        content: const WordSafeText('사진과 글, 댓글이 함께 삭제돼요.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: const WordSafeText('취소'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('삭제'),
+            child: const WordSafeText('삭제'),
           ),
         ],
       ),
@@ -599,7 +601,7 @@ class _PhotoDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('우리의 순간')),
+    appBar: AppBar(title: const WordSafeText('우리의 순간')),
     body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('families')
@@ -613,7 +615,7 @@ class _PhotoDetailPage extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         if (data == null) {
-          return const Center(child: Text('삭제된 사진이에요.'));
+          return const Center(child: WordSafeText('삭제된 사진이에요.'));
         }
         final likedBy = List<String>.from(data['likedBy'] as List? ?? const []);
         final isLiked = likedBy.contains(uid);
@@ -627,11 +629,11 @@ class _PhotoDetailPage extends StatelessWidget {
                 uid: data['authorUid'] as String?,
                 role: role,
               ),
-              title: Text(
+              title: WordSafeText(
                 "${data['authorName'] ?? '이름 미설정'}님이 올린 사진",
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              subtitle: Text(
+              subtitle: WordSafeText(
                 _formatDate((data['createdAt'] as Timestamp?)?.toDate()),
               ),
               trailing: isMine
@@ -703,12 +705,12 @@ class _PhotoDetailPage extends StatelessWidget {
                               : CupertinoIcons.heart,
                           color: isLiked ? const Color(0xFFC36555) : _green,
                         ),
-                        label: Text('좋아요 ${likedBy.length}'),
+                        label: WordSafeText('좋아요 ${likedBy.length}'),
                       ),
                     ],
                   ),
                   const Divider(height: 32),
-                  const Text(
+                  const WordSafeText(
                     '따뜻한 한마디',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
@@ -725,7 +727,7 @@ class _PhotoDetailPage extends StatelessWidget {
                       if (comments.isEmpty) {
                         return const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Text(
+                          child: WordSafeText(
                             '첫 번째 댓글로 마음을 전해 보세요.',
                             style: TextStyle(color: Color(0xFF68766D)),
                           ),
@@ -741,7 +743,7 @@ class _PhotoDetailPage extends StatelessWidget {
                                 role: comment.data()['authorRole'] as String?,
                                 radius: 17,
                               ),
-                              title: Text(
+                              title: WordSafeText(
                                 comment.data()['authorName'] as String? ??
                                     '이름 미설정',
                                 style: const TextStyle(
@@ -749,7 +751,7 @@ class _PhotoDetailPage extends StatelessWidget {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              subtitle: Text(
+                              subtitle: WordSafeText(
                                 comment.data()['text'] as String? ?? '',
                                 style: const TextStyle(
                                   fontSize: 15,
@@ -835,7 +837,7 @@ class _CommentComposerState extends State<_CommentComposer> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('댓글을 저장하지 못했어요. 다시 시도해주세요.')),
+          const SnackBar(content: WordSafeText('댓글을 저장하지 못했어요. 다시 시도해주세요.')),
         );
       }
     } finally {
@@ -863,7 +865,7 @@ class _CommentComposerState extends State<_CommentComposer> {
         child: FilledButton.icon(
           onPressed: _sending ? null : _send,
           icon: const Icon(CupertinoIcons.arrow_up, size: 18),
-          label: const Text('댓글 등록'),
+          label: const WordSafeText('댓글 등록'),
         ),
       ),
     ],

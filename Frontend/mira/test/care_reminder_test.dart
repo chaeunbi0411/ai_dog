@@ -4,6 +4,29 @@ import 'package:mira/services/daily_care_service.dart';
 
 void main() {
   test(
+    'all overdue members remain selectable until their care is complete',
+    () {
+      final now = DateTime.parse('2026-09-28T21:00:00+09:00');
+      final care = <String, dynamic>{
+        '_dateId': careDate(now),
+        'mom': {'action': careActions[0], 'completedAt': null},
+        'dad': {'action': careActions[2], 'completedAt': null},
+        'sister': {'action': careActions[3], 'completedAt': null},
+      };
+      final members = {'mom': '엄마', 'dad': '아빠', 'sister': '언니'};
+      expect(pendingCareReminders(care, members, now).map((r) => r.uid), [
+        'mom',
+        'dad',
+        'sister',
+      ]);
+      care['mom']['completedAt'] = 'saved';
+      expect(pendingCareReminders(care, members, now).map((r) => r.uid), [
+        'dad',
+        'sister',
+      ]);
+    },
+  );
+  test(
     'preview skips time limits but keeps actual assignments and completion',
     () {
       final now = DateTime.parse('2026-09-08T10:00:00+09:00');

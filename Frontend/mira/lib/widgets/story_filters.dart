@@ -1,3 +1,4 @@
+import 'word_wrap_text.dart';
 import 'package:flutter/material.dart';
 
 enum StoryFilter { all, mine, liked }
@@ -71,7 +72,7 @@ class _StoryFiltersState extends State<StoryFilters> {
         children: [
           for (final option in StoryFilter.values)
             ChoiceChip(
-              label: Text(switch (option) {
+              label: WordSafeText(switch (option) {
                 StoryFilter.all => '전체',
                 StoryFilter.mine => '내 이야기',
                 StoryFilter.liked => '좋아요 한 이야기',

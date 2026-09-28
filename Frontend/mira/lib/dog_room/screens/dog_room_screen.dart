@@ -1,3 +1,4 @@
+import '../../widgets/word_wrap_text.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -9,6 +10,7 @@ import '../models/care_reminder.dart';
 import '../widgets/care_action_bar.dart';
 import '../widgets/dog_status_panel.dart';
 import '../widgets/feeding_dog.dart';
+import '../widgets/pet_wardrobe.dart';
 import '../widgets/tail_wagging_dog.dart';
 
 class DogRoomScreen extends StatefulWidget {
@@ -18,15 +20,21 @@ class DogRoomScreen extends StatefulWidget {
     this.onCareAction,
     this.careMessage,
     this.careReminder,
+    this.careReminders = const [],
     this.petName = '강아지',
     this.onTalk,
+    this.viewerUid,
+    this.viewerAddress = '가족',
   });
   final DogController controller;
   final ValueChanged<CareAction>? onCareAction;
   final String? careMessage;
   final CareReminder? careReminder;
+  final List<CareReminder> careReminders;
   final String petName;
   final VoidCallback? onTalk;
+  final String? viewerUid;
+  final String viewerAddress;
 
   @override
   State<DogRoomScreen> createState() => _DogRoomScreenState();
@@ -40,6 +48,25 @@ class _DogRoomScreenState extends State<DogRoomScreen>
   Timer? _frameTimer;
   Timer? _speechTimer;
   bool _speechVisible = true;
+  CareReminder? _selectedReminder;
+  final _waitedKeys = <String>{};
+  List<CareReminder> get _waitingReminders =>
+      _reminders.where((r) => r.uid != widget.viewerUid).toList();
+  CareReminder? get _nextReminder {
+    final pending = _waitingReminders;
+    return pending.where((r) => !_waitedKeys.contains(r.key)).firstOrNull ??
+        pending.firstOrNull;
+  }
+
+  int _speechIndex = 0;
+  bool _growing = false;
+  GrowthStage? _stageBeforeGrowth;
+  int? _observedLevel;
+  GrowthStage? _observedStage;
+  List<CareReminder> get _reminders => [
+    ...widget.careReminders,
+    if (widget.careReminder != null) widget.careReminder!,
+  ];
   String? _specialSpeech;
   double _dogX = 80;
   double _dogY = 100;
@@ -84,6 +111,10 @@ class _DogRoomScreenState extends State<DogRoomScreen>
       duration: const Duration(milliseconds: 460),
     );
     widget.controller.addListener(_refresh);
+    if (!widget.controller.isLoading) {
+      _observedLevel = widget.controller.state.level;
+      _observedStage = widget.controller.state.stage;
+    }
     widget.controller.initialize();
     _scheduleSpeechDismiss();
     _moveTimer = Timer(const Duration(seconds: 1), _moveDog);
@@ -98,11 +129,24 @@ class _DogRoomScreenState extends State<DogRoomScreen>
   @override
   void didUpdateWidget(covariant DogRoomScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.careReminder?.key != widget.careReminder?.key &&
-        _waitingForCare) {
+    _waitedKeys.removeWhere((key) => !_reminders.any((r) => r.key == key));
+    if (oldWidget.viewerUid != widget.viewerUid ||
+        oldWidget.viewerAddress != widget.viewerAddress) {
+      _specialSpeech = null;
+      _speechIndex = 0;
+    }
+    if (_selectedReminder != null) {
+      _selectedReminder = _reminders
+          .where((r) => r.key == _selectedReminder!.key)
+          .firstOrNull;
+    }
+    if (_waitingForCare &&
+        !_waitingReminders.any((r) => r.key == _selectedReminder?.key)) {
       _moveTimer?.cancel();
       _tapController.reset();
       _waitingForCare = false;
+      _selectedReminder = null;
+      _specialSpeech = null;
       _greetingMember = false;
       _isMoving = false;
       _dogX = _positionBeforeWaiting?.dx ?? 80;
@@ -128,7 +172,116 @@ class _DogRoomScreenState extends State<DogRoomScreen>
     _scheduleSpeechDismiss();
   }
 
-  void _refresh() => _showSpeech();
+  void _refresh() {
+    if (widget.controller.isLoading) return;
+    final state = widget.controller.state;
+    final previousLevel = _observedLevel;
+    final previousStage = _observedStage;
+    _observedLevel = state.level;
+    _observedStage = state.stage;
+    if (previousLevel != null && state.level > previousLevel && !_growing) {
+      unawaited(_celebrateGrowth(previousStage!, previousLevel));
+    } else if (!_growing) {
+      _showSpeech();
+    }
+  }
+
+  Future<void> _celebrateGrowth(
+    GrowthStage previousStage,
+    int previousLevel,
+  ) async {
+    setState(() {
+      _growing = true;
+      _stageBeforeGrowth = previousStage;
+    });
+    // Let the care animation finish before the transformation starts.
+    await Future<void>.delayed(const Duration(milliseconds: 4400));
+    if (!mounted) return;
+    _moveTimer?.cancel();
+    setState(() => _isMoving = false);
+    _showSpeech('어라… 몸이 이상해요..! 간질간질해요!');
+    await Future<void>.delayed(const Duration(milliseconds: 1800));
+    if (!mounted) return;
+    setState(() => _stageBeforeGrowth = null);
+    final state = widget.controller.state;
+    final gifts = <String>[
+      if (previousLevel < 6 && state.level >= 6) '옷장과 분홍 리본',
+      if (previousLevel < 16 && state.level >= 16) '방 꾸미기와 봄빛 배경',
+      if (state.level >= 32) '새 성장 선물',
+      if ([
+        50,
+        77,
+        99,
+      ].any((level) => previousLevel < level && state.level >= level))
+        state.familyTitle!,
+    ];
+    _showSpeech(
+      '뿅! Lv.${state.level}이 됐어요!'
+      '${gifts.isEmpty ? ' 함께해 줘서 고마워요 ♥' : '\n${gifts.join(', ')} 해금!'}',
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (!mounted) return;
+    setState(() => _growing = false);
+    _moveTimer = Timer(const Duration(seconds: 1), _moveDog);
+  }
+
+  void _speakNeeds() {
+    if (_growing) return;
+    final address = widget.viewerAddress == '가족'
+        ? ''
+        : '${widget.viewerAddress}, ';
+    final mine = _reminders.where((r) => r.uid == widget.viewerUid).firstOrNull;
+    final state = widget.controller.state;
+    final messages = [
+      if (mine != null) mine.message.substring(mine.role.length).trim(),
+      if (_waitingForCare && _selectedReminder?.uid != widget.viewerUid)
+        '${_selectedReminder!.role} 기다리고 있어요. 같이 기다려 줄래요?',
+      if (state.hunger < 40) '꼬르륵… 배고파요! 밥 주세요.',
+      if (state.cleanliness < 40) '몸이 꼬질꼬질해요. 씻고 싶어요!',
+      if (state.happiness < 40) '심심해요. 같이 놀아 줄래요?',
+      if (state.energy < 40) '하암… 졸려요. 재워 주세요.',
+    ];
+    if (messages.isEmpty) {
+      messages.addAll([
+        '오늘도 같이 있어서 좋아요 ♥',
+        '쓰다듬어 주면 꼬리가 절로 흔들려요!',
+        '우리 오늘 뭐 하고 놀까요?',
+      ]);
+    }
+    _showSpeech('$address${messages[_speechIndex++ % messages.length]}');
+  }
+
+  void _openWardrobe() => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * .85,
+    ),
+    builder: (_) =>
+        PetWardrobe(controller: widget.controller, onMotion: _specialMotion),
+  );
+
+  Future<void> _specialMotion() async {
+    if (_growing ||
+        _waitingForCare ||
+        _activeAction != null ||
+        _isCareTransition ||
+        _isTailWagging) {
+      return;
+    }
+    _moveTimer?.cancel();
+    setState(() {
+      _isMoving = false;
+      _pettingDog = true;
+    });
+    _showSpeech('우리 가족 최고! 신나게 인사해요 ♥');
+    for (var i = 0; i < 3; i++) {
+      await _tapController.forward(from: 0);
+      if (!mounted) return;
+    }
+    setState(() => _pettingDog = false);
+    _moveTimer = Timer(const Duration(seconds: 1), _moveDog);
+  }
 
   @override
   void didChangeDependencies() {
@@ -163,6 +316,7 @@ class _DogRoomScreenState extends State<DogRoomScreen>
     if (!mounted ||
         _activeAction != null ||
         _isCareTransition ||
+        _growing ||
         _waitingForCare) {
       return;
     }
@@ -229,6 +383,7 @@ class _DogRoomScreenState extends State<DogRoomScreen>
     if (_isMoving ||
         _activeAction != null ||
         _isCareTransition ||
+        _growing ||
         (_waitingForCare || _tapController.isAnimating)) {
       return;
     }
@@ -247,6 +402,7 @@ class _DogRoomScreenState extends State<DogRoomScreen>
   Future<void> _performCare(CareAction action) async {
     if (_activeAction != null ||
         _isCareTransition ||
+        _growing ||
         _waitingForCare ||
         _pettingDog) {
       return;
@@ -278,8 +434,6 @@ class _DogRoomScreenState extends State<DogRoomScreen>
       await Future<void>.delayed(const Duration(milliseconds: 950));
       if (!mounted) return;
     }
-    final previousStage = widget.controller.state.stage;
-    final previousLevel = widget.controller.state.level;
     final succeeded = await widget.controller.care(action);
     if (!mounted) return;
     if (!succeeded) {
@@ -321,21 +475,13 @@ class _DogRoomScreenState extends State<DogRoomScreen>
         _moveTimer = Timer(const Duration(milliseconds: 700), _moveDog);
       },
     );
-
-    final newStage = widget.controller.state.stage;
-    final newLevel = widget.controller.state.level;
-    if (newStage != previousStage) {
-      await _showGrowthDialog(newStage);
-    } else if (newStage == GrowthStage.adult && newLevel > previousLevel) {
-      await _showAdultRewardDialog(newLevel);
-    }
   }
 
-  void _waitForCare() {
-    if (widget.careReminder == null) return;
+  void _waitForCare(CareReminder reminder) {
     if (_waitingForCare ||
         _activeAction != null ||
         _isCareTransition ||
+        _growing ||
         _pettingDog) {
       return;
     }
@@ -344,6 +490,11 @@ class _DogRoomScreenState extends State<DogRoomScreen>
     _moveTimer?.cancel();
     _tapController.reset();
     setState(() {
+      if (_waitingReminders.every((r) => _waitedKeys.contains(r.key))) {
+        _waitedKeys.clear();
+      }
+      _waitedKeys.add(reminder.key);
+      _selectedReminder = reminder;
       _waitingForCare = true;
       _speechVisible = true;
       _specialSpeech = null;
@@ -355,6 +506,7 @@ class _DogRoomScreenState extends State<DogRoomScreen>
       _dogX = targetX;
       _dogY = max(64.0, _roomViewport.height * .57 - 100);
     });
+    _scheduleSpeechDismiss();
     _moveTimer = Timer(const Duration(milliseconds: 900), () {
       if (!mounted) return;
       setState(() {
@@ -389,15 +541,6 @@ class _DogRoomScreenState extends State<DogRoomScreen>
     _moveTimer = Timer(const Duration(seconds: 1), _moveDog);
   }
 
-  Future<void> _showAdultRewardDialog(int level) async {
-    final reward = AdultReward.values[(level - 32) % AdultReward.values.length];
-    _showSpeech('함께해서 행복해! ${reward.label} 선물도 생겼어 ♥');
-  }
-
-  Future<void> _showGrowthDialog(GrowthStage stage) async {
-    _showSpeech('나 조금 자란 것 같지? 앞으로도 함께해 ♥');
-  }
-
   @override
   void dispose() {
     _moveTimer?.cancel();
@@ -417,27 +560,28 @@ class _DogRoomScreenState extends State<DogRoomScreen>
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final state = widget.controller.state;
+    final visibleStage = _stageBeforeGrowth ?? state.stage;
     final isBabySleeping =
-        state.stage == GrowthStage.baby && _activeAction == CareAction.sleep;
+        visibleStage == GrowthStage.baby && _activeAction == CareAction.sleep;
     final isBabyWaiting =
-        state.stage == GrowthStage.baby &&
+        visibleStage == GrowthStage.baby &&
         _waitingForCare &&
         !_greetingMember &&
         !_isMoving;
     final dogAsset = isBabyWaiting
         ? 'assets/dog/baby_wait.png'
-        : state.stage == GrowthStage.baby && _isMoving
+        : visibleStage == GrowthStage.baby && _isMoving
         ? _babyWalkFrames[_walkFrame]
         : isBabySleeping
         ? 'assets/dog/baby_sleep.png'
-        : state.stage.assetPath;
+        : visibleStage.assetPath;
     return Scaffold(
       body: SafeArea(
         top: false,
         bottom: false,
-        child: Column(
+        child: _RoomLayout(
           children: [
-            if (widget.careReminder != null)
+            if (_nextReminder != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: SizedBox(
@@ -446,35 +590,41 @@ class _DogRoomScreenState extends State<DogRoomScreen>
                     onPressed:
                         _activeAction != null ||
                             _isCareTransition ||
+                            _growing ||
                             _isTailWagging ||
                             (_waitingForCare && _isMoving)
                         ? null
                         : _waitingForCare
                         ? _greetMember
-                        : _waitForCare,
+                        : () => _waitForCare(_nextReminder!),
                     icon: Icon(
                       _waitingForCare
                           ? Icons.favorite_outline
                           : Icons.door_front_door_outlined,
                       size: 16,
                     ),
-                    label: Text(
+                    label: WordSafeText(
                       _waitingForCare
-                          ? '방으로 돌아가기'
-                          : '${widget.careReminder!.role} 기다리기',
+                          ? '\uBC29\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30'
+                          : '${_nextReminder!.role} \uAE30\uB2E4\uB9AC\uAE30',
                     ),
                     style: OutlinedButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      textStyle: const TextStyle(
-                        fontFamily: 'Pretendard',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
                     ),
                   ),
                 ),
               ),
             DogStatusPanel(state: state, petName: widget.petName),
+            TextButton.icon(
+              onPressed: _growing ? null : _openWardrobe,
+              icon: Icon(
+                state.wardrobeUnlocked ? Icons.checkroom : Icons.lock_outline,
+                size: 18,
+              ),
+              label: WordSafeText(
+                state.wardrobeUnlocked ? '옷장 · 성장 선물' : '옷장 · Lv.6에 해금',
+              ),
+            ),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -495,6 +645,42 @@ class _DogRoomScreenState extends State<DogRoomScreen>
                           alignment: Alignment.center,
                         ),
                       ),
+                      if (!_waitingForCare &&
+                          state.roomTheme != 'default' &&
+                          state.canUseTheme(state.roomTheme))
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: state.roomTheme == 'spring'
+                                      ? [
+                                          const Color(0x447FCF94),
+                                          const Color(0x44FFD0DE),
+                                        ]
+                                      : [
+                                          const Color(0x886B60AF),
+                                          const Color(0x336CA9E6),
+                                        ],
+                                ),
+                              ),
+                              child: state.roomTheme == 'starlight'
+                                  ? const Align(
+                                      alignment: Alignment.topCenter,
+                                      child: WordSafeText(
+                                        '✧     ⋆     ✧     ⋆     ✧',
+                                        style: TextStyle(
+                                          fontSize: 32,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ),
                       if (!_waitingForCare)
                         Positioned(
                           right: 12,
@@ -600,9 +786,9 @@ class _DogRoomScreenState extends State<DogRoomScreen>
                                     flipX: true,
                                     child: FeedingDog(
                                       animation: _careController,
-                                      idleAsset: state.stage.assetPath,
+                                      idleAsset: visibleStage.assetPath,
                                       eatingAsset:
-                                          state.stage == GrowthStage.baby
+                                          visibleStage == GrowthStage.baby
                                           ? 'assets/dog/baby_eat.png'
                                           : null,
                                     ),
@@ -629,14 +815,14 @@ class _DogRoomScreenState extends State<DogRoomScreen>
                                           ),
                                     child: Transform.flip(
                                       key: ValueKey((
-                                        state.stage,
+                                        visibleStage,
                                         isBabySleeping,
                                         isBabyWaiting,
                                       )),
                                       flipX: !_isFacingRight,
                                       child: _isTailWagging
                                           ? TailWaggingDog(
-                                              asset: state.stage.assetPath,
+                                              asset: visibleStage.assetPath,
                                               animation: _tapController,
                                             )
                                           : Image.asset(
@@ -650,7 +836,7 @@ class _DogRoomScreenState extends State<DogRoomScreen>
                                                     error,
                                                     stackTrace,
                                                   ) => Image.asset(
-                                                    state.stage.assetPath,
+                                                    visibleStage.assetPath,
                                                     width: 140,
                                                     height: 140,
                                                     fit: BoxFit.contain,
@@ -661,6 +847,50 @@ class _DogRoomScreenState extends State<DogRoomScreen>
                           ),
                         ),
                       ),
+                      if (state.accessory != 'none' &&
+                          state.canWear(state.accessory))
+                        AnimatedPositioned(
+                          duration: _moveDuration,
+                          curve: Curves.easeInOut,
+                          left:
+                              _dogX.clamp(
+                                0,
+                                max(0, constraints.maxWidth - 140),
+                              ) +
+                              52,
+                          top:
+                              _dogY.clamp(
+                                64,
+                                max(64, constraints.maxHeight - 140),
+                              ) +
+                              (state.accessory == 'crown' ? 12 : 87),
+                          child: IgnorePointer(
+                            child: WordSafeText(
+                              state.accessory == 'crown' ? '👑' : '🎀',
+                              style: const TextStyle(fontSize: 30),
+                            ),
+                          ),
+                        ),
+                      if (_growing)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Center(
+                              child: TweenAnimationBuilder<double>(
+                                key: ValueKey(_stageBeforeGrowth),
+                                tween: Tween(begin: .5, end: 1),
+                                duration: const Duration(milliseconds: 1000),
+                                curve: Curves.elasticOut,
+                                builder: (_, value, child) =>
+                                    Transform.scale(scale: value, child: child),
+                                child: const Icon(
+                                  Icons.auto_awesome,
+                                  size: 100,
+                                  color: Color(0xFFFFD76D),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       Positioned(
                         left: (_dogX + 86).clamp(
                           8,
@@ -797,12 +1027,12 @@ class _DogRoomScreenState extends State<DogRoomScreen>
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text(
-                                        (_waitingForCare
-                                                ? widget.careReminder?.message
+                                      WordSafeText(
+                                        _specialSpeech ??
+                                            (_waitingForCare
+                                                ? _selectedReminder?.message
                                                 : null) ??
                                             widget.careMessage ??
-                                            _specialSpeech ??
                                             widget.controller.message,
                                         textAlign: TextAlign.center,
                                         style: const TextStyle(
@@ -821,10 +1051,8 @@ class _DogRoomScreenState extends State<DogRoomScreen>
                                   height: 48,
                                   child: IconButton.filledTonal(
                                     key: const ValueKey('dog-speech-toggle'),
-                                    tooltip: '강아지와 대화하기',
-                                    onPressed:
-                                        widget.onTalk ??
-                                        () => _showSpeech(_specialSpeech),
+                                    tooltip: '강아지 마음 듣기',
+                                    onPressed: _speakNeeds,
                                     icon: const Icon(
                                       Icons.priority_high_rounded,
                                       size: 22,
@@ -850,13 +1078,14 @@ class _DogRoomScreenState extends State<DogRoomScreen>
               TextButton.icon(
                 onPressed: widget.onTalk,
                 icon: const Icon(Icons.chat_bubble_outline),
-                label: const Text('강아지와 대화하기'),
+                label: const WordSafeText('강아지와 대화하기'),
               ),
             CareActionBar(
               onAction: _performCare,
               enabled:
                   _activeAction == null &&
                   !_isCareTransition &&
+                  !_growing &&
                   !_waitingForCare &&
                   !_pettingDog,
             ),
@@ -865,6 +1094,31 @@ class _DogRoomScreenState extends State<DogRoomScreen>
       ),
     );
   }
+}
+
+/// Keep the room usable when text or a landscape viewport needs more height.
+class _RoomLayout extends StatelessWidget {
+  const _RoomLayout({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+      final controlsHeight = (360 + max(0, children.length - 4) * 48) * scale;
+      final roomHeight = max(280.0, constraints.maxHeight - controlsHeight);
+      return SingleChildScrollView(
+        child: Column(
+          children: [
+            for (final child in children)
+              if (child is Expanded)
+                SizedBox(height: roomHeight, child: child.child)
+              else
+                child,
+          ],
+        ),
+      );
+    },
+  );
 }
 
 class _SleepZzz extends StatelessWidget {
@@ -888,7 +1142,7 @@ class _SleepZzz extends StatelessWidget {
                 offset: Offset(8 * progress, -34 * progress),
                 child: Transform.scale(
                   scale: .75 + .35 * progress,
-                  child: const Text(
+                  child: const WordSafeText(
                     'Zzz',
                     style: TextStyle(
                       color: Color(0xFF7E78C8),
@@ -1046,7 +1300,10 @@ class _CareEffect extends StatelessWidget {
             children: [
               Icon(icon, color: color),
               const SizedBox(width: 5),
-              Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+              WordSafeText(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             ],
           ),
         ),

@@ -56,7 +56,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('비밀번호 재설정')),
+    appBar: AppBar(title: const WordSafeText('비밀번호 재설정')),
     body: ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -79,12 +79,12 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _busy ? null : _send,
-            child: Text(_busy ? '메일 보내는 중…' : '재설정 메일 보내기'),
+            child: WordSafeText(_busy ? '메일 보내는 중…' : '재설정 메일 보내기'),
           ),
         ] else
           FilledButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('로그인으로 돌아가기'),
+            child: const WordSafeText('로그인으로 돌아가기'),
           ),
       ],
     ),

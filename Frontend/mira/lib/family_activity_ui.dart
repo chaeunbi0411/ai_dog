@@ -81,8 +81,10 @@ class _ActivityBuilderState extends State<_ActivityBuilder> {
 
   @override
   Widget build(BuildContext context) {
-    if (_message != null) return Text(_message!);
-    if (_errors.isNotEmpty) return const Text('가족 기록을 불러오지 못했어요. 연결을 확인해주세요.');
+    if (_message != null) return WordSafeText(_message!);
+    if (_errors.isNotEmpty) {
+      return const WordSafeText('가족 기록을 불러오지 못했어요. 연결을 확인해주세요.');
+    }
     if (_data.length < 5) {
       return const Padding(
         padding: EdgeInsets.all(16),
@@ -114,7 +116,7 @@ class _WeeklyQuests extends StatelessWidget {
       children: [
         Section('가족 퀘스트', '이번 주 ${data.questsDone} / 2'),
         const SizedBox(height: 4),
-        const Text(
+        const WordSafeText(
           '월요일마다 새로 시작해요 · 완료 시 각각 에너지 +40',
           style: TextStyle(fontSize: 11, color: Colors.black54),
         ),
@@ -156,7 +158,7 @@ class _LiveMetrics extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              const WordSafeText(
                 '오늘의 감정',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
@@ -167,7 +169,10 @@ class _LiveMetrics extends StatelessWidget {
                 data.moodPercent == null ? '기록 전' : '${data.moodPercent}%',
                 description: '개인 감정 기록의 기쁨 비율 · ${data.todayMoods.length}명 참여',
               ),
-              TextButton(onPressed: onEmotion, child: const Text('나의 감정 기록하기')),
+              TextButton(
+                onPressed: onEmotion,
+                child: const WordSafeText('나의 감정 기록하기'),
+              ),
             ],
           ),
         ),
@@ -176,7 +181,7 @@ class _LiveMetrics extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              const WordSafeText(
                 '가족 활동',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
@@ -187,7 +192,10 @@ class _LiveMetrics extends StatelessWidget {
                 '${data.energy}',
                 description: '공유 글·사진·좋아요·돌봄·퀘스트로 쌓은 이번 주 점수',
               ),
-              TextButton(onPressed: onFamily, child: const Text('가족 이야기 남기기')),
+              TextButton(
+                onPressed: onFamily,
+                child: const WordSafeText('가족 이야기 남기기'),
+              ),
             ],
           ),
         ),
@@ -215,7 +223,7 @@ class _LiveInteraction extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 const SizedBox(height: 12),
-                Text(
+                WordSafeText(
                   '공유 글 ${data.weekMoments.length} · 사진 ${data.weekPhotos.length} · 좋아요 ${data.likes} · 돌봄 ${data.careCount}',
                   style: const TextStyle(color: Colors.black54),
                 ),
@@ -373,7 +381,7 @@ class _AiPageState extends State<AiPage> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        Text(
+                        WordSafeText(
                           '이번 주 공유 글 ${data.weekMoments.length} · 사진 ${data.weekPhotos.length} · 돌봄 ${data.careCount}',
                           style: const TextStyle(
                             color: Colors.white60,
@@ -447,7 +455,7 @@ class _AiPageState extends State<AiPage> {
                     ),
                   ],
                   const SizedBox(height: 20),
-                  const Text(
+                  const WordSafeText(
                     '가족이 공유한 이야기와 프로필을 참고해 대화해요.',
                     style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),
@@ -455,7 +463,7 @@ class _AiPageState extends State<AiPage> {
                   if (_history.isEmpty && _pending == null)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
+                      child: WordSafeText(
                         '궁금한 이야기를 편하게 건네주세요.',
                         style: TextStyle(color: Colors.black45),
                       ),
@@ -473,7 +481,7 @@ class _AiPageState extends State<AiPage> {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
+                          child: WordSafeText(
                             _error!,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.error,
@@ -483,7 +491,7 @@ class _AiPageState extends State<AiPage> {
                         ),
                         TextButton(
                           onPressed: () => _send(data, retry: _pending),
-                          child: const Text('다시 보내기'),
+                          child: const WordSafeText('다시 보내기'),
                         ),
                       ],
                     ),
@@ -541,7 +549,7 @@ class _InsightBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            WordSafeText(
               mine ? '나' : 'MIRA',
               style: const TextStyle(
                 fontSize: 11,

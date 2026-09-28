@@ -45,16 +45,16 @@ void showPrivacyDocument(BuildContext context, {bool terms = false}) {
   Navigator.of(context).push<void>(
     MaterialPageRoute(
       builder: (_) => Scaffold(
-        appBar: AppBar(title: Text(terms ? '이용 안내' : '개인정보 처리방침')),
+        appBar: AppBar(title: WordSafeText(terms ? '이용 안내' : '개인정보 처리방침')),
         body: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            Text(
+            WordSafeText(
               terms ? '함께 지키는 작은 약속' : '우리의 정보, 알기 쉽게',
               style: const TextStyle(fontSize: 27, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
-            const Text(
+            const WordSafeText(
               'MIRA 체험판 · 2026. 09. 06',
               style: TextStyle(color: Color(0xFF68766D)),
             ),
@@ -80,7 +80,7 @@ void showPrivacyDocument(BuildContext context, {bool terms = false}) {
                         ),
                       ]
                     : privacySections) ...[
-              Text(
+              WordSafeText(
                 section.$1,
                 style: const TextStyle(
                   fontSize: 18,
@@ -121,7 +121,9 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('확인 내용을 저장하지 못했어요. 다시 시도해 주세요.')),
+          const SnackBar(
+            content: WordSafeText('확인 내용을 저장하지 못했어요. 다시 시도해 주세요.'),
+          ),
         );
       }
     } finally {
@@ -140,7 +142,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
         child: CheckboxListTile(
           contentPadding: EdgeInsets.zero,
           controlAffinity: ListTileControlAffinity.leading,
-          title: Text(
+          title: WordSafeText(
             text,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
@@ -148,7 +150,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
           onChanged: saving ? null : onChanged,
         ),
       ),
-      TextButton(onPressed: onRead, child: const Text('보기')),
+      TextButton(onPressed: onRead, child: const WordSafeText('보기')),
     ],
   );
 
@@ -171,7 +173,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
             ),
           ),
           const SizedBox(height: 28),
-          const Text(
+          const WordSafeText(
             '시작하기 전에,\n우리의 작은 약속',
             style: TextStyle(
               fontSize: 30,
@@ -181,7 +183,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
+          const WordSafeText(
             '어떤 정보가 저장되는지 함께 살펴봐요.\n어린이는 보호자와 함께 읽어 주세요.',
             style: TextStyle(
               fontSize: 16,
@@ -196,12 +198,12 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  WordSafeText(
                     '사진과 마음은 이 기기에',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   SizedBox(height: 10),
-                  Text(
+                  WordSafeText(
                     '선택한 사진·글·댓글과 강아지의 성장을 저장해요. 지금은 다른 사람에게 전송되지 않아요. 저장한 내용은 설정에서 삭제할 수 있어요.',
                     style: TextStyle(fontSize: 15, height: 1.7),
                   ),
@@ -225,10 +227,10 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
           const SizedBox(height: 24),
           FilledButton(
             onPressed: terms && privacy && !saving ? _continue : null,
-            child: Text(saving ? '저장하는 중…' : '확인하고 시작하기'),
+            child: WordSafeText(saving ? '저장하는 중…' : '확인하고 시작하기'),
           ),
           const SizedBox(height: 12),
-          const Text(
+          const WordSafeText(
             '선택하지 않은 사진에는 접근하지 않아요.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: Color(0xFF68766D)),
