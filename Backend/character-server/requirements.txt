@@ -12,3 +12,4 @@ safetensors
 rembg
 onnxruntime
 torch
+opencv-python-headless>=4.10,<4.12

@@ -12,6 +12,10 @@ import '../widgets/dog_status_panel.dart';
 import '../widgets/feeding_dog.dart';
 import '../widgets/pet_wardrobe.dart';
 import '../widgets/tail_wagging_dog.dart';
+import '../models/character_animation_set.dart';
+import '../models/care_motion.dart';
+import '../services/character_save_service.dart';
+import '../widgets/animated_character.dart';
 
 class DogRoomScreen extends StatefulWidget {
   const DogRoomScreen({
@@ -25,6 +29,7 @@ class DogRoomScreen extends StatefulWidget {
     this.onTalk,
     this.viewerUid,
     this.viewerAddress = '가족',
+    this.characterScope = 'local',
   });
   final DogController controller;
   final ValueChanged<CareAction>? onCareAction;
@@ -35,6 +40,7 @@ class DogRoomScreen extends StatefulWidget {
   final VoidCallback? onTalk;
   final String? viewerUid;
   final String viewerAddress;
+  final String characterScope;
 
   @override
   State<DogRoomScreen> createState() => _DogRoomScreenState();
@@ -47,6 +53,46 @@ class _DogRoomScreenState extends State<DogRoomScreen>
   Timer? _actionTimer;
   Timer? _frameTimer;
   Timer? _speechTimer;
+  CharacterAnimationSet? _character;
+  int _characterLoad = 0;
+  int _careRun = 0;
+  CarePhase? _carePhase;
+  CareAction? _sequenceAction;
+  String get _characterClip {
+    if (_sequenceAction != null && _carePhase != null) {
+      return careClip(_sequenceAction!, _carePhase!);
+    }
+    if (_isMoving) return 'walk';
+    return _isTailWagging ? 'greet' : 'idle';
+  }
+
+  Future<void> _loadCharacter() async {
+    final load = ++_characterLoad;
+    try {
+      final character = await CharacterSaveService.instance.loadAnimations(widget.characterScope);
+      if (!mounted || load != _characterLoad) return;
+      // Decode everything before activation; no network/disk access during care.
+      if (character != null) {
+        for (final clip in character.clips.values) {
+          for (final frame in clip.frames) {
+            if (!mounted || load != _characterLoad) return;
+            Object? decodeError;
+            await precacheImage(MemoryImage(frame), context,
+              onError: (error, stack) => decodeError = error);
+            if (decodeError != null) throw const FormatException('Invalid frame');
+          }
+        }
+      }
+      if (!mounted || load != _characterLoad) return;
+      // A newly saved set becomes visible after the current action finishes.
+      while (_isCareTransition && mounted && load == _characterLoad) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      if (mounted && load == _characterLoad) setState(() => _character = character);
+    } catch (_) {
+      // Preserve the current character, or the bundled default on first launch.
+    }
+  }
   bool _speechVisible = true;
   CareReminder? _selectedReminder;
   final _waitedKeys = <String>{};
@@ -98,6 +144,10 @@ class _DogRoomScreenState extends State<DogRoomScreen>
   @override
   void initState() {
     super.initState();
+    CharacterSaveService.instance.addListener(_loadCharacter);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadCharacter();
+    });
     _breathingController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -129,6 +179,16 @@ class _DogRoomScreenState extends State<DogRoomScreen>
   @override
   void didUpdateWidget(covariant DogRoomScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.characterScope != widget.characterScope) {
+      _careRun++;
+      _character = null;
+      _activeAction = null;
+      _sequenceAction = null;
+      _carePhase = null;
+      _isCareTransition = false;
+      _careController.stop();
+      _loadCharacter();
+    }
     _waitedKeys.removeWhere((key) => !_reminders.any((r) => r.key == key));
     if (oldWidget.viewerUid != widget.viewerUid ||
         oldWidget.viewerAddress != widget.viewerAddress) {
@@ -181,7 +241,7 @@ class _DogRoomScreenState extends State<DogRoomScreen>
     _observedStage = state.stage;
     if (previousLevel != null && state.level > previousLevel && !_growing) {
       unawaited(_celebrateGrowth(previousStage!, previousLevel));
-    } else if (!_growing) {
+    } else if (!_growing && !_isCareTransition) {
       _showSpeech();
     }
   }
@@ -195,7 +255,10 @@ class _DogRoomScreenState extends State<DogRoomScreen>
       _stageBeforeGrowth = previousStage;
     });
     // Let the care animation finish before the transformation starts.
-    await Future<void>.delayed(const Duration(milliseconds: 4400));
+    while (_isCareTransition || _activeAction != null) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+    }
     if (!mounted) return;
     _moveTimer?.cancel();
     setState(() => _isMoving = false);
@@ -226,6 +289,10 @@ class _DogRoomScreenState extends State<DogRoomScreen>
   }
 
   void _speakNeeds() {
+    if (_sequenceAction != null && _carePhase != null) {
+      _showSpeech(careSpeech(_sequenceAction!, _carePhase!));
+      return;
+    }
     if (_growing) return;
     final address = widget.viewerAddress == '가족'
         ? ''
@@ -400,81 +467,112 @@ class _DogRoomScreenState extends State<DogRoomScreen>
   }
 
   Future<void> _performCare(CareAction action) async {
-    if (_activeAction != null ||
-        _isCareTransition ||
-        _growing ||
-        _waitingForCare ||
-        _pettingDog) {
+    if (_activeAction != null || _isCareTransition || _growing ||
+        _waitingForCare || _pettingDog || widget.controller.isLoading) return;
+    if (action == CareAction.play && widget.controller.state.energy < 10) {
+      await widget.controller.care(action);
       return;
     }
+    final run = ++_careRun;
+    final origin = Offset(_dogX, _dogY);
     _moveTimer?.cancel();
-    if (action == CareAction.feed ||
-        action == CareAction.wash ||
-        action == CareAction.sleep) {
-      final targetX = switch (action) {
-        CareAction.feed => 16.0,
-        CareAction.wash => 24.0,
-        CareAction.sleep => max(12.0, _roomViewport.width - 166),
-        CareAction.play => _dogX,
-      };
-      final targetY = switch (action) {
-        CareAction.feed => max(72.0, _roomViewport.height - 156),
-        CareAction.wash => max(72.0, _roomViewport.height - 220),
-        CareAction.sleep => max(72.0, _roomViewport.height - 225),
-        _ => max(72.0, _roomViewport.height - 154),
-      };
+    _actionTimer?.cancel();
+    setState(() {
+      _isCareTransition = true;
+      _sequenceAction = action;
+    });
+    bool valid() => mounted && run == _careRun;
+    Future<bool> pause(Duration duration) async {
+      await Future<void>.delayed(duration);
+      return valid();
+    }
+    void phase(CarePhase phase) {
+      setState(() => _carePhase = phase);
+      _showSpeech(careSpeech(action, phase));
+    }
+    Future<bool> moveTo(Offset target) async {
+      final bounded = Offset(
+        target.dx.clamp(0.0, max(0.0, _roomViewport.width - 140)).toDouble(),
+        target.dy.clamp(64.0, max(64.0, _roomViewport.height - 140)).toDouble(),
+      );
+      final distance = (bounded - Offset(_dogX, _dogY)).distance;
+      var duration = Duration(milliseconds: (distance / 105 * 1000).round().clamp(650, 3000));
+      final walkDuration = _character?.clips['walk']?.duration;
+      if (walkDuration != null) {
+        // Stop on the idle boundary of a complete gait, not midway through a step.
+        final cycles = max(1, (duration.inMicroseconds / walkDuration.inMicroseconds).round());
+        duration = walkDuration * cycles;
+      }
       setState(() {
-        _isCareTransition = true;
-        _moveDuration = const Duration(milliseconds: 900);
-        _isFacingRight = targetX > _dogX;
-        _dogX = targetX;
-        _dogY = targetY;
+        _moveDuration = duration;
+        if ((bounded.dx - _dogX).abs() > 1) _isFacingRight = bounded.dx > _dogX;
+        _dogX = bounded.dx;
+        _dogY = bounded.dy;
         _isMoving = true;
       });
-      await Future<void>.delayed(const Duration(milliseconds: 950));
-      if (!mounted) return;
+      if (!await pause(duration + const Duration(milliseconds: 50))) return false;
+      setState(() { _isMoving = false; _walkFrame = 0; });
+      return true;
     }
-    final succeeded = await widget.controller.care(action);
-    if (!mounted) return;
-    if (!succeeded) {
+    Duration clipDuration(String name, int fallback) =>
+        _character?.clips[name]?.duration ?? Duration(milliseconds: fallback);
+    try {
+      phase(CarePhase.approaching);
+      final target = switch (action) {
+        CareAction.feed => Offset(16, max(72.0, _roomViewport.height - 156)),
+        CareAction.wash => Offset(24, max(72.0, _roomViewport.height - 220)),
+        CareAction.sleep => Offset(max(12.0, _roomViewport.width - 166), max(72.0, _roomViewport.height - 225)),
+        CareAction.play => Offset(max(20.0, (_roomViewport.width - 140) * .55), max(72.0, _roomViewport.height - 156)),
+      };
+      if (!await moveTo(target)) return;
       setState(() {
-        _isCareTransition = false;
-        _isMoving = false;
+        _activeAction = action;
+        _isFacingRight = action != CareAction.feed;
       });
-      _moveTimer = Timer(const Duration(seconds: 1), _moveDog);
-      return;
-    }
-
-    widget.onCareAction?.call(action);
-    _moveTimer?.cancel();
-    setState(() {
-      _isCareTransition = false;
-      _activeAction = action;
-      _isMoving = false;
-      if (action == CareAction.feed) _isFacingRight = false;
-      if (action == CareAction.wash) _isFacingRight = true;
-    });
-    if (action == CareAction.feed) {
-      _careController.duration = const Duration(milliseconds: 4200);
-      _careController.forward(from: 0);
-    } else if (action == CareAction.sleep) {
+      phase(CarePhase.entering);
       _careController.duration = const Duration(milliseconds: 650);
-      _careController.forward(from: 0);
-    } else if (action == CareAction.wash || action == CareAction.play) {
-      _careController.duration = const Duration(milliseconds: 460);
-      _careController.repeat();
-    }
-    _actionTimer?.cancel();
-    _actionTimer = Timer(
-      Duration(milliseconds: action == CareAction.feed ? 4200 : 1700),
-      () {
-        if (!mounted) return;
+      if (action == CareAction.sleep) {
+        _careController.forward(from: 0);
+      } else if (action == CareAction.feed) {
+        _careController.duration = const Duration(milliseconds: 4200);
+        _careController.forward(from: 0);
+      } else {
+        _careController.duration = const Duration(milliseconds: 460);
+        _careController.repeat();
+      }
+      if (!await pause(clipDuration('${action.name}_enter', 600))) return;
+      phase(CarePhase.acting);
+      final loops = action == CareAction.sleep ? 3 : 2;
+      final acting = _character == null
+          ? Duration(milliseconds: action == CareAction.feed ? 3000 : 2400)
+          : clipDuration(action.name, 1200) * loops;
+      if (!await pause(acting)) return;
+      phase(CarePhase.exiting);
+      if (!await pause(clipDuration('${action.name}_exit', 600))) return;
+      _careController.stop();
+      _careController.reset();
+      setState(() => _activeAction = null);
+      phase(CarePhase.returning);
+      if (!await moveTo(origin)) return;
+      // Rewards, family completion and level-up happen only after the motion.
+      final succeeded = await widget.controller.care(action);
+      if (!valid()) return;
+      if (succeeded) widget.onCareAction?.call(action);
+      _showSpeech(widget.controller.message);
+    } finally {
+      if (valid()) {
         _careController.stop();
         _careController.reset();
-        setState(() => _activeAction = null);
+        setState(() {
+          _activeAction = null;
+          _sequenceAction = null;
+          _carePhase = null;
+          _isCareTransition = false;
+          _isMoving = false;
+        });
         _moveTimer = Timer(const Duration(milliseconds: 700), _moveDog);
-      },
-    );
+      }
+    }
   }
 
   void _waitForCare(CareReminder reminder) {
@@ -543,6 +641,9 @@ class _DogRoomScreenState extends State<DogRoomScreen>
 
   @override
   void dispose() {
+    _careRun++;
+    _characterLoad++;
+    CharacterSaveService.instance.removeListener(_loadCharacter);
     _moveTimer?.cancel();
     _actionTimer?.cancel();
     _frameTimer?.cancel();
@@ -781,7 +882,10 @@ class _DogRoomScreenState extends State<DogRoomScreen>
                                 ),
                               );
                             },
-                            child: _activeAction == CareAction.feed
+                            child: _character != null
+                                ? AnimatedCharacter(key: ValueKey(_carePhase), character: _character!,
+                                    clip: _characterClip, facingRight: _isFacingRight)
+                                : _activeAction == CareAction.feed
                                 ? Transform.flip(
                                     flipX: true,
                                     child: FeedingDog(

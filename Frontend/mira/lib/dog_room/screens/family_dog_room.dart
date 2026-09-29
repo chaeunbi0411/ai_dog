@@ -226,6 +226,7 @@ class _FamilyDogRoomState extends State<FamilyDogRoom> {
         child: DogRoomScreen(
           key: ValueKey(widget.uid),
           controller: widget.controller,
+          characterScope: _familyId ?? widget.uid ?? 'local',
           onCareAction: _complete,
           careReminders: _reminders,
           viewerUid: widget.uid,

@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'design/mira_icons.dart';
 import 'dog_room/controllers/dog_controller.dart';
 import 'dog_room/services/character_save_service.dart';
+import 'dog_room/models/character_animation_set.dart';
 import 'dog_room/services/dog_save_service.dart';
 import 'dog_room/screens/family_dog_room.dart';
 import 'firebase_options.dart';
@@ -932,6 +933,7 @@ class _PetSetupState extends State<PetSetup> {
   bool _hadExistingPet = false;
   String? _analysisError;
   Uint8List? _characterImage;
+  CharacterAnimationSet? _characterAnimations;
   bool _generatingCharacter = false;
   String? _characterError;
   int _characterSeed = 42;
@@ -989,6 +991,7 @@ class _PetSetupState extends State<PetSetup> {
   }
 
   Future<void> _generateCharacter({bool reroll = false}) async {
+    if (_generatingCharacter || _saving) return;
     final breed = _breedController.text.trim();
     final color = _colorController.text.trim();
     if (breed.isEmpty || color.isEmpty) {
@@ -999,6 +1002,7 @@ class _PetSetupState extends State<PetSetup> {
     setState(() {
       _generatingCharacter = true;
       _characterError = null;
+      _characterAnimations = null;
     });
     try {
       final bytes = await CharacterServerService.instance.generate(
@@ -1007,23 +1011,39 @@ class _PetSetupState extends State<PetSetup> {
         personality: personality,
         seed: _characterSeed,
       );
+      if (!mounted) return;
       setState(() => _characterImage = bytes);
+      final animations = await CharacterServerService.instance.generateMotions(
+        preview: bytes, breed: breed, color: color, personality: personality,
+        seed: _characterSeed, isCancelled: () => !mounted,
+      );
+      if (!mounted) return;
+      setState(() => _characterAnimations = animations);
     } on CharacterServerException catch (e) {
-      setState(() => _characterError = e.message);
+      if (mounted) setState(() => _characterError = e.message);
     } catch (_) {
-      setState(() => _characterError = '캐릭터를 만들지 못했어요. 잠시 후 다시 시도해주세요.');
+      if (mounted) setState(() => _characterError = '캐릭터를 만들지 못했어요. 잠시 후 다시 시도해주세요.');
     } finally {
       if (mounted) setState(() => _generatingCharacter = false);
     }
   }
 
   Future<void> _handleSubmit() async {
+    if (_generatingCharacter || _saving) return;
+    if (_characterImage != null && _characterAnimations == null) {
+      setState(() => _saveError = '캐릭터 준비가 끝나지 않았어요. 다시 만들거나 기본 강아지로 시작해주세요.');
+      return;
+    }
     if (_personalityProfile == null) {
       setState(() => _saveError = '네 문항의 성격 테스트를 먼저 완료해주세요.');
       return;
     }
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null || _familyId == null) {
+      if (_characterAnimations != null) {
+        await CharacterSaveService.instance.saveAnimations(uid ?? 'local', _characterAnimations!);
+      }
+      if (!mounted) return;
       widget.onDone();
       return;
     }
@@ -1043,13 +1063,14 @@ class _PetSetupState extends State<PetSetup> {
         gender: _petGender,
         preferredAddress: _petAddressController.text,
       );
-      final image = _characterImage;
-      if (image != null) {
-        await CharacterSaveService.instance.save(image);
+      final animations = _characterAnimations;
+      if (animations != null) {
+        await CharacterSaveService.instance.saveAnimations(_familyId!, animations);
       }
+      if (!mounted) return;
       widget.onDone();
     } catch (_) {
-      setState(() => _saveError = '저장하지 못했어요. 다시 시도해주세요.');
+      if (mounted) setState(() => _saveError = '저장하지 못했어요. 다시 시도해주세요.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -1346,12 +1367,21 @@ class _PetSetupState extends State<PetSetup> {
             _characterError!,
             style: const TextStyle(color: Colors.red, fontSize: 12),
           ),
+          TextButton(
+            onPressed: (_generatingCharacter || _saving) ? null : () => setState(() {
+              _characterImage = null;
+              _characterAnimations = null;
+              _characterError = null;
+              _saveError = null;
+            }),
+            child: const WordSafeText('기존 강아지 유지하기'),
+          ),
         ],
         const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: _generatingCharacter
+            onPressed: (_generatingCharacter || _saving)
                 ? null
                 : () => _generateCharacter(reroll: _characterImage != null),
             icon: _generatingCharacter
@@ -1383,7 +1413,7 @@ class _PetSetupState extends State<PetSetup> {
         SizedBox(
           width: double.infinity,
           child: FilledButton(
-            onPressed: (_saving || _loadingExisting) ? null : _handleSubmit,
+            onPressed: (_saving || _loadingExisting || _generatingCharacter) ? null : _handleSubmit,
             style: FilledButton.styleFrom(padding: const EdgeInsets.all(18)),
             child: _saving
                 ? const SizedBox(

@@ -37,7 +37,7 @@ CORS(app)
 
 # Frontend/mira/assets/dog/baby_idle.png — 기존 강아지방 캐릭터, img2img 기준 이미지.
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
-REFERENCE_IMAGE_PATH = os.path.normpath(
+REFERENCE_IMAGE_PATH = os.environ.get("CHARACTER_REFERENCE_IMAGE") or os.path.normpath(
     os.path.join(_APP_DIR, "..", "..", "Frontend", "mira", "assets", "dog", "baby_idle.png")
 )
 
@@ -47,15 +47,16 @@ _img2img_pipe = None
 _bg_session = None
 _ref_image = None
 _lock = threading.Lock()
+_inference_lock = threading.Lock()
 
 
 def _get_pipeline():
     """(img2img 파이프라인, rembg 세션, 기준 이미지) 반환. 첫 호출 때만 무겁게 로드."""
     global _img2img_pipe, _bg_session, _ref_image
-    if _img2img_pipe is not None:
+    if _ref_image is not None:
         return _img2img_pipe, _bg_session, _ref_image
     with _lock:
-        if _img2img_pipe is None:
+        if _ref_image is None:
             import torch
             from diffusers import (
                 StableDiffusionPipeline,
@@ -383,20 +384,26 @@ def generate():
     breed_kr = request.form.get("breed", DEFAULT_BREED)
     color_kr = request.form.get("color", DEFAULT_COLOR)
     personality_kr = request.form.get("personality", DEFAULT_PERSONALITY)
-    seed = int(request.form.get("seed", 42))
+    try:
+        seed = int(request.form.get("seed", 42))
+        if not 0 <= seed < 2**32:
+            raise ValueError("invalid seed")
+    except ValueError:
+        return {"error": "invalid seed"}, 400
 
     prompt, negative_prompt = build_prompt(breed_kr, color_kr, personality_kr)
 
     img2img_pipe, bg_session, ref_image = _get_pipeline()
     generator = torch.Generator(device="cuda").manual_seed(seed)
-    img = img2img_pipe(
-        prompt=prompt,
-        negative_prompt=negative_prompt,
-        image=ref_image,
-        strength=IMG2IMG_STRENGTH,
-        guidance_scale=GUIDANCE_SCALE,
-        generator=generator,
-    ).images[0]
+    with _inference_lock:
+        img = img2img_pipe(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            image=ref_image,
+            strength=IMG2IMG_STRENGTH,
+            guidance_scale=GUIDANCE_SCALE,
+            generator=generator,
+        ).images[0]
 
     final = remove(img, session=bg_session)
 
@@ -404,6 +411,39 @@ def generate():
     final.save(buf, format="PNG")
     buf.seek(0)
     return send_file(buf, mimetype="image/png")
+
+
+def _build_motions(preview_bytes, traits):
+    import torch
+    from PIL import Image
+    from rembg import remove
+    from motion_generation import build_character
+
+    pipe, bg_session, _ = _get_pipeline()
+    breed = _lookup(traits['breed'], BREED_MAP, DEFAULT_BREED)
+    color = _lookup(traits['color'], COLOR_MAP, DEFAULT_COLOR)
+    _, negative = build_prompt(traits['breed'], traits['color'], traits['personality'])
+
+    def generate_pose(reference, pose):
+        white = Image.new('RGBA', reference.size, 'white')
+        source = Image.alpha_composite(white, reference).convert('RGB').resize((512, 512))
+        prompt = (
+            f'the same {color} {breed} puppy as the reference image, {pose}, '
+            'full body chibi dog, preserve identical face, ears, fur markings and colors, '
+            'kawaii mascot illustration, flat vector art, cel shading, bold black outline, '
+            'soft round body, isolated on plain white background, no shadow, no props'
+        )
+        with _inference_lock, torch.inference_mode():
+            result = pipe(prompt=prompt, negative_prompt=negative, image=source,
+                          strength=0.58, guidance_scale=9.0, num_inference_steps=30,
+                          generator=torch.Generator(device='cuda').manual_seed(traits['seed'])).images[0]
+        return remove(result, session=bg_session).convert('RGBA')
+
+    return build_character(preview_bytes, generate_pose)
+
+
+from motion_jobs import register_motion_routes
+register_motion_routes(app, _build_motions)
 
 
 if __name__ == "__main__":

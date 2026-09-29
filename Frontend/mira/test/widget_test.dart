@@ -357,7 +357,11 @@ void main() {
     expect(find.text('옷장 · Lv.6에 해금'), findsOneWidget);
     await tester.tap(find.text('놀기'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 4400));
+    // Care now includes the outward walk, action and return before level-up.
+    for (var i = 0; i < 240 &&
+        find.text('어라… 몸이 이상해요..! 간질간질해요!').evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
     expect(find.text('어라… 몸이 이상해요..! 간질간질해요!'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 1800));
     expect(find.textContaining('뿅! Lv.6'), findsOneWidget);
